@@ -1,7 +1,7 @@
-name: "Simon_et_al_2020"
+name: "Sylvain_et_al_2020"
 output_dir: ../docs
 navbar:
-  title: "Simon_et_al_2020"
+  title: "Sylvain_et_al_2020"
   left:
   - text: Home
     href: index.html

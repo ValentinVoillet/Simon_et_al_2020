@@ -1,3 +1,3 @@
 # Output
 
-Save processed data files here.
+Save processed data files and .RData files here.
