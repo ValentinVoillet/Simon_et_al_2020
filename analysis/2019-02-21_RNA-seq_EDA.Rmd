@@ -1,0 +1,289 @@
+---
+title: "- RNA-seq - EDA -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 21st 2019*  
+*Update: January, 14th 2020*   
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(Biobase)
+library(limma)
+library(edgeR)
+library(here)
+```
+
+# Description & importing data
+______________________________
+
+RNA was extracted from **12 patients**. Alignment and quantification have been performed by Qiagen.  
+
+* 12 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22** and **P23**;  
+
+* Five time points: **T0**, **M1** and **M2**;  
+
+* One treatment: **anti-PD1**;  
+
+* Four fractions: **PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**;  
+
+* Two outcomes: **NR** and **R**;  
+
+* Two batches.      
+
+QC have already been performed - please look at the RNA-QC section. **Nineteen samples** have been removed.  
+
+
+
+
+# Exploratory analysis
+______________________
+
+The `edgeR` Bioconductor package is used to calculate normalization factors to scale the raw library sizes, followed by a normalization using the `voom` transformation from the `limma` Bioconductor package. It transforms count data to **log2-counts per million** (log2 CPM) and estimates the mean-variance relationship to compute appropriate observation-level weights.  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Normalization / TMM and voom transformation
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+# ?calcNormFactors - calculate normalization factors to align columns of a count matrix / calculate normalization factors to scale the raw library sizes.
+norm <- calcNormFactors(countData)
+
+# ?voom - transforms RNA-seq data ready for linear modelling / transforms count data to log2-count per million (logCPM)
+# When the library sizes are quite variable between samples, then the voom approach is theoretically more powerful than limma-trend. In this approach, the voom transformation is applied to the normalized and filtered countData.
+voomData <- voom(countData, lib.size = (colSums(exprs(countData)) * norm)) # return E - normalized values
+normData <- voomData$E
+```
+
+## Boxplot
+
+```{r boxplot_norm, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+###--- Boxplots / Normalized Count
+data.table(variable = 1:ncol(normData), value = apply(normData, 2, sum, na.rm = TRUE), pData(countData)) %>%
+  ggplot(aes(x = variable, y = value, fill = sample.id)) +
+    geom_bar(stat = "identity") + 
+    facet_wrap(~ batch, scales = "free_x") + 
+    labs(y = "Normalized read count total", fill = NULL) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") -> plot1
+
+###--- Boxplots / log2-CPM
+data.table(reshape2::melt(normData), batch = c(rep("batch 1", 78000), rep("batch 2", 39975))) %>%
+  ggplot(aes(x = Var2, y = value, fill = Var2)) +
+    geom_boxplot() +
+    facet_wrap(~ batch, scales = "free_x") + 
+    labs(y = "log2-CPM", fill = NULL) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") -> plot2
+
+cowplot::plot_grid(plot1, plot2, ncol = 1, align = "v")
+```
+
+## Principal Component Analysis (PCA)
+
+```{r pca_norm_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=6, fig.height=6}
+###--- PCA
+pca <- prcomp(normData, center = FALSE, scale = FALSE) # summary(pca) PC1 98.15% - PC2 0.41%
+data.ggplot <- data.table(pca$rotation[, 1:3], pData(countData))
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = sample.id), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank(), legend.position = "none")
+```
+```{r pca_norm_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=11.5, fig.height=16}
+###--- PCA
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = batch), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotA
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = patient.id), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotB
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = time.point), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = NULL) +
+    scale_color_brewer(palette = "Dark2") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotC
+
+fraction.colors <- c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")
+names(fraction.colors) <- c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+")
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = fraction.desc), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotD
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = outcome), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotE
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = n.genes.on), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = "# detected\ngenes") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotF
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = library.size), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = "# mapped\nreads") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotG
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = `% reads dropped, < 55 bp`), size = .8) +
+    labs(x = "PC1 98.15%", y = "PC2 0.41%", color = "% reads\ndropped <55bp") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotH
+
+cowplot::plot_grid(plotA, plotB, plotC, plotD, plotE, plotF, plotG, plotH, ncol = 2, align = "v", labels = "AUTO")
+```
+
+There is no strong technical effect. 
+
+## MultiDimensional Scaling (MDS)
+
+```{r mds_norm_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=6, fig.height=6}
+###--- MDS
+mds <- plotMDS(normData, plot = FALSE)
+data.ggplot <- data.table(Dim1 = mds$x, Dim2 = mds$y, pData(countData))
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = sample.id), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank(), legend.position = "none")
+```
+```{r mds_norm_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=11.5, fig.height=16}
+###--- MDS
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = batch), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotA
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = patient.id), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotB
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = time.point), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    scale_color_brewer(palette = "Dark2") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotC
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = fraction.desc), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotD
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = outcome), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotE
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = n.genes.on), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = "# detected\ngenes") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotF
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = library.size), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = "# mapped\nreads") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotG
+
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = `% reads dropped, < 55 bp`), size = .8) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = "% reads\ndropped <55bp") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotH
+
+cowplot::plot_grid(plotA, plotB, plotC, plotD, plotE, plotF, plotG, plotH, ncol = 2, align = "v", labels = "AUTO")
+```
+
+There is no batch effect - no need to correct for batch.  
+
+```{r mds_norm_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+###--- MDS
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_point(aes(color = fraction.desc), size = .8) +
+    facet_wrap(~ treatment) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotA
+data.ggplot %>%
+  ggplot(aes(x = Dim1, y = Dim2)) +
+    geom_path(aes(group = paste(patient.id, fraction.desc)), size = .3, color = "grey", arrow = arrow(angle = 25, length = unit(0.15, "cm"))) +
+    geom_point(aes(color = fraction.desc), size = .8) +
+    facet_wrap(~ treatment) +
+    labs(x = "Leading logFC Dim 1", y = "Leading logFC Dim 2", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotB
+
+cowplot::plot_grid(plotA, plotB, align = "v", labels = "AUTO", ncol = 1)
+```
+
+
+
