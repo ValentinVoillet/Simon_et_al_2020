@@ -42,7 +42,7 @@ RNA was extracted from **12 patients**. Alignment and quantification have been p
 
 * 12 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22** and **P23**;  
 
-* Five time points: **T0**, **M1** and **M2**;  
+* Three time points: **T0**, **M1** and **M2**;  
 
 * One treatment: **anti-PD1**;  
 
