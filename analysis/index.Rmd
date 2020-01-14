@@ -1,11 +1,59 @@
 ---
-title: "Home"
+title: "PD-1 and TIGIT co-expression identifies a circulating CD8 T cell population predictive of response to anti-PD-1 therapy in melanoma and Merkel-cell carcinoma patients"
 site: workflowr::wflow_site
 output:
   workflowr::wflow_html:
     toc: false
-editor_options:
-  chunk_output_type: console
 ---
 
-Welcome to my research website.
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+Welcome to my research website.  
+
+# **Project overview**
+______________________
+
+RNA-seq and TCR-seq have been performed from patients having anti-PD1 treatment. Four fractions of CD8 T cells have been extracted (**PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**) at different time points (**T0**, **M1** and **M2**).   
+
+
+
+
+# **RNA-seq**
+_____________
+
+* [Quality control](2019-02-20_RNA-seq_QC.html)  
+
+* [Exploratory analysis](2019-02-21_RNA-seq_EDA.html)  
+
+* Differential expression analysis  
+  + [within each fraction - differences between time points](2019-02-22_RNA-seq_DE_1.html)  
+  + [within each time point - differences between fractions](2019-02-22_RNA-seq_DE_2.html)  
+  + [differences between outcomes (non-responders & responders)](2019-02-22_RNA-seq_DE_3.html)  
+  + [interaction across time point and fraction]
+
+
+# **TCR-seq**
+_____________
+
+* [Quality control]()  
+
+* Exploratory analysis  
+  + [clonality and overlap sequences](2019-02-28_TCR-seq_EDA.html)  
+  + [clustering (T0, M1 & M2)](2020-01-12_TCR-seq_EDA_2.html)  
+
+
+
+
+
+
+
+
+

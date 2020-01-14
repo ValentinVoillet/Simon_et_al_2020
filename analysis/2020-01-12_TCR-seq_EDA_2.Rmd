@@ -1,0 +1,2469 @@
+---
+title: "- TCR-seq - EDA -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: January, 12th 2020*  
+*Update: January, 14th 2020*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(here)
+library(VennDiagram)
+library(gridExtra)
+library(ComplexHeatmap)
+library(doMC)
+library(broom)
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+load(here("output", "2020-01-12_TCR-seq_EDA_2.RData"))
+# save.image(here("output", "2020-01-12_TCR-seq_EDA_2.RData"))
+```
+
+# Description & importing data
+______________________________
+
+RNA was extracted from **12 patients**. Alignment and quantification of TCR sequences have been performed by QIAGEN  
+
+* 12 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22** and **P23**;  
+
+* Four time points: **T0**, **M1**, **M2** & **M6**;  
+
+* One treatment: **anti-PD1**;  
+
+* Four fractions: **PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**;  
+
+* Two outcomes: **NR** and **R**;  
+
+* Three batches.  
+
+QC have already been performed - please look at the TCR-QC section. **Fourteen samples** have been removed.  
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Importation
+#- TCR.pData
+here("output", "TCR_pData.rds") %>%
+  readRDS() -> TCR.pData
+# pData (patient/fraction w/ at least T0 & M1)
+TCR.pData %>% select(patient.id, time.point, fraction, outcome) %>% View("pData")
+TCR.pData <- TCR.pData[c(1:39, 41:43, 45:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData %>%
+  arrange(patient.id) %>%
+  select(patient.id, time.point, fraction, outcome) %>% 
+  View("pData")
+
+#- TCR.exprs
+here("output", "TCR_count.rds") %>%
+  readRDS() %>%
+  filter(QIAGEN.id %in% TCR.pData$QIAGEN.id) -> TCR.exprs
+```
+
+
+
+
+# Summary statistics
+____________________
+
+The clonality score is derived from the Shannon entropy, which is calculated from the frequencies of all productive sequences divided by the logarithm of the total number of unique productive sequences. This normalized entropy value is then inverted (1 - normalized entropy) to produce the clonality metric.  
+The Gini coefficient is an alternative metric used to calculate repertoire diversity.  
+Both Gini coefficient and clonality are reported on a scale from 0 to 1 where 0 indicates all sequences have the same frequency and 1 indicates the repertoire is dominated by a single sequence.  
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Extracting productive sequences - aggregate samples having the same cdr3aa, cdr3nt and V/J-regions
+TCR.exprs %>%
+  group_by(QIAGEN.id, chain, cdr3nt, cdr3aa, `V-region`, `J-region`) %>%
+  summarise(frequency = sum(freq.after.filtering), 
+            `UMIs with >= 1 reads` = sum(`UMIs with >= 1 reads`),
+            `UMIs with >= 2 reads` = sum(`UMIs with >= 2 reads`),
+            `UMIs with >= 3 reads` = sum(`UMIs with >= 3 reads`),
+            `UMIs with >= 4 reads` = sum(`UMIs with >= 4 reads`),
+            `UMIs with >= 5 reads` = sum(`UMIs with >= 5 reads`),
+            `UMIs with >= 6 reads` = sum(`UMIs with >= 6 reads`),
+            `UMIs with >= 7 reads` = sum(`UMIs with >= 7 reads`),
+            total.reads = sum(`# reads`),
+            total.UMIs = sum(total.UMIs)) %>%
+  arrange(QIAGEN.id, chain, desc(`UMIs with >= 1 reads`)) -> productive.aa
+
+###--- Summary statistics
+productive.aa %>%
+  filter(chain == "TRAC" | chain == "TRBC") %>% 
+  group_by(QIAGEN.id, chain) %>%
+  summarise(total.reads = sum(total.reads),
+            total.UMIs = sum(total.UMIs),
+            unique.productive = n(),
+            entropy = -sum(frequency * log2(frequency), na.rm = TRUE),
+            gini.coef = ineq::Gini(frequency)) %>%
+  mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) -> dt
+dt <- merge(dt, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc", "outcome")], by = "QIAGEN.id")
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+###--- Boxplot - A
+dt %>%
+  filter(time.point != "M6") %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+    geom_jitter(aes(color = fraction.desc), size = .4) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    scale_color_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+    scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+    facet_grid(time.point ~ chain, scales = "free_y") +
+    labs(y = "Clonality", fill = "Fraction", color = "Fraction") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1),
+          axis.title.x = element_blank(),
+          axis.text.y = element_text(size = 10),
+          strip.background = element_rect(fill = "grey80"),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 7),
+          strip.text = element_text(size = 12),
+          legend.position = "none") -> plotA
+# plotA
+
+###--- Boxplot - B
+dt %>%
+  filter(time.point != "M6") %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+  geom_jitter(aes(color = fraction.desc, alpha = outcome), size = .4) +
+  geom_boxplot(aes(fill = fraction.desc, alpha = outcome), outlier.shape = NA) +
+  scale_color_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
+  facet_grid(time.point ~ chain, scales = "free_y") +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
+  labs(y = "Clonality", fill = "Fraction", color = "Fraction", alpha = "Outcome") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 10),
+        strip.background = element_rect(fill = "grey80"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 7),
+        strip.text = element_text(size = 12),
+        legend.position = "none") -> plotB
+# plotB
+
+###--- Boxplots - A & B
+# Cairo::Cairo(width = 10, height = 8, units = "in", file = here::here(), pointsize = 12, type = "png", bg = "white", dpi = 500)
+cowplot::plot_grid(plotA, plotB, ncol = 2)
+# dev.off()
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Statistics - between outcomes within each fraction & time point
+dt %>%
+  filter(time.point != "M6") %>%
+  select(chain, time.point, fraction.desc, outcome, clonality) %>%
+  group_by(chain, time.point, fraction.desc) %>%
+  do(tidy(wilcox.test(clonality ~ outcome, data = ., paired = FALSE))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+
+###--- Statistics - between fractions within each time point
+dt %>%
+  filter(time.point != "M6") %>%
+  select(chain, time.point, fraction.desc, clonality, patient.id) %>%
+  group_by(chain, time.point) %>%
+  do(tidy(kruskal.test(clonality ~ fraction.desc, data = .))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+```
+
+
+
+
+# Clustering
+____________
+
+Within each fraction, let"s look at sequences (both TRAC and TRBC). We declare as emerging, expanding, emerging-contracting, expanding-contracting, contracting-expanding, contracting sequences (regarding to M1) that are declared as significant (Fisher exact test to calculate differential abundance of each TRBC (or TRAC) between two time points --`total.UMIs` value is used) in the following contrasts T0 vs M1. Other sequences are declared as non-expanding/contracting.  
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Differential abundance function
+differentialAbundance <- function(sample1, sample2, list, zero = 0.001, parallel = FALSE, FDR = .05)
+{
+  #- Inputs
+  x <- data.table(list[[sample1]])
+  y <- data.table(list[[sample2]])
+  if(nrow(x) == 0 | nrow(y) == 0){
+    results <- data.table(sequence = character(),
+                          cdr3aa = character(),
+                          cdr3nt = character(),
+                          v_genes = character(),
+                          j_genes = character(),
+                          x = numeric(),
+                          y = numeric(),
+                          p = numeric(),
+                          q = numeric(),
+                          log2FC = numeric())
+    names(results)[6:7] <- c(sample1, sample2)
+    return(results)
+  }
+  x$seq <- paste(x$cdr3aa, x$cdr3nt, x$`V-region`, x$`J-region`, sep = '_')
+  y$seq <- paste(y$cdr3aa, y$cdr3nt, y$`V-region`, y$`J-region`, sep = '_')
+  sequences <- union(x$seq, y$seq)
+  #- Fisher's exact test
+  fisherFunction <- function(sequence){
+    p.value <- as.numeric()
+    sample1.freq <- as.numeric()
+    sample2.freq <- as.numeric()
+    if(any(x[, seq] == sequence)){
+      in.x <- x[x[, seq] == sequence, total.UMIs]
+      x.freq <- x[x[, seq] == sequence, freq.after.filtering] * 100
+    }else{
+      in.x <- 0
+      x.freq <- 0
+    }
+    if(any(y[, seq] == sequence)){
+       in.y <- y[y[, seq] == sequence, total.UMIs]
+       y.freq <- y[y[, seq] == sequence, freq.after.filtering] * 100
+    }else{
+       in.y <- 0
+       y.freq <- 0
+    }
+    not.x <- sum(x[, total.UMIs]) - in.x
+    not.y <- sum(y[, total.UMIs]) - in.y
+    matrix <- matrix(c(in.x, in.y, not.x, not.y), nrow = 2)
+    fisher <- stats::fisher.test(matrix, workspace = 2e+06)
+    p.value <- c(p.value, fisher$p.value)
+    sample1.freq <- c(sample1.freq, x.freq)
+    sample2.freq <- c(sample2.freq, y.freq)
+    cdr3aa <- str_split(sequence, '_')[[1]][1]
+    cdr3nt <- str_split(sequence, '_')[[1]][2]
+    v_genes <- str_split(sequence, '_')[[1]][3]
+    j_genes <- str_split(sequence, '_')[[1]][4]
+    #- Output
+    results <- data.table(sequence = sequence,
+                          cdr3aa = cdr3aa,
+                          cdr3nt = cdr3nt,
+                          v_genes = v_genes,
+                          j_genes = j_genes,
+                          x = sample1.freq,
+                          y = sample2.freq,
+                          p = p.value)
+    return(results)
+  }
+  results <- data.table(plyr::ldply(sequences, fisherFunction, .parallel = parallel))
+  results[, q := p.adjust(p, method = 'fdr')]
+  setorder(results, 'q')
+  #- log2FC
+  x.not.zero <- results$x
+  x.not.zero[x.not.zero == 0] <- zero
+  y.not.zero <- results$y
+  y.not.zero[y.not.zero == 0] <- zero  
+  results[, log2FC := log2(x.not.zero / y.not.zero)]
+  #- Output
+  names(results)[6:7] <- c(sample1, sample2)
+  results <- results[order(results$q, decreasing = FALSE), ]
+  results <- results[q < FDR]
+  rownames(results) <- NULL
+  return(results)
+}
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- PD-1+TIGIT+
+# Extract PD-1+TIGIT+ samples only
+TCR.pData %>% 
+  filter(fraction.desc == "PD-1+TIGIT+") %>% 
+  pull(QIAGEN.id) -> sample.ids
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids) -> TCR
+TCR <- merge(TCR, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc")], by = "QIAGEN.id")
+
+#- TRAC
+registerDoMC(2)
+TRAC.abundance.results_1 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRAC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRAC.abundance.results_1) <- unique(TCR$patient.id)
+
+#- TRBC
+registerDoMC(2)
+TRBC.abundance.results_1 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRBC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRBC.abundance.results_1) <- unique(TCR$patient.id)
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- PD-1+
+# Extract PD-1+ samples only
+TCR.pData %>% 
+  filter(fraction.desc == "PD-1+") %>% 
+  pull(QIAGEN.id) -> sample.ids
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids) -> TCR
+TCR <- merge(TCR, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc")], by = "QIAGEN.id")
+
+#- TRAC
+registerDoMC(2)
+TRAC.abundance.results_2 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRAC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRAC.abundance.results_2) <- unique(TCR$patient.id)
+
+#- TRBC
+registerDoMC(2)
+TRBC.abundance.results_2 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRBC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRBC.abundance.results_2) <- unique(TCR$patient.id)
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- TIGIT+
+# Extract TIGIT+ samples only
+TCR.pData %>% 
+  filter(fraction.desc == "TIGIT+") %>% 
+  pull(QIAGEN.id) -> sample.ids
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids) -> TCR
+TCR <- merge(TCR, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc")], by = "QIAGEN.id")
+
+#- TRAC
+registerDoMC(2)
+TRAC.abundance.results_3 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRAC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRAC.abundance.results_3) <- unique(TCR$patient.id)
+
+#- TRBC
+registerDoMC(2)
+TRBC.abundance.results_3 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRBC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRBC.abundance.results_3) <- unique(TCR$patient.id)
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- PD-1-TIGIT-
+# Extract PD-1-TIGIT- samples only
+TCR.pData %>% 
+  filter(fraction.desc == "PD-1-TIGIT-") %>% 
+  pull(QIAGEN.id) -> sample.ids
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids) -> TCR
+TCR <- merge(TCR, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc")], by = "QIAGEN.id")
+
+#- TRAC
+registerDoMC(2)
+TRAC.abundance.results_4 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRAC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRAC.abundance.results_4) <- unique(TCR$patient.id)
+
+#- TRBC
+registerDoMC(2)
+TRBC.abundance.results_4 <- foreach(i = unique(TCR$patient.id)) %dopar%
+{
+  # list & variables
+  TRC.tmp <- "TRBC"
+  list.tmp <- list(T0 = TCR %>% filter(time.point == "T0", patient.id == i, chain == TRC.tmp),
+                   M1 = TCR %>% filter(time.point == "M1", patient.id == i, chain == TRC.tmp),
+                   M2 = TCR %>% filter(time.point == "M2", patient.id == i, chain == TRC.tmp),
+                   M6 = TCR %>% filter(time.point == "M6", patient.id == i, chain == TRC.tmp))
+  # T0 vs M1
+  T0vsM1 <- differentialAbundance(sample1 = "T0", sample2 = "M1", list = list.tmp, parallel = FALSE)
+  # T0 vs M2
+  T0vsM2 <- differentialAbundance(sample1 = "T0", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # T0 vs M6
+  T0vsM6 <- differentialAbundance(sample1 = "T0", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M1 vs M2
+  M1vsM2 <- differentialAbundance(sample1 = "M1", sample2 = "M2", list = list.tmp, parallel = FALSE)
+  # M1 vs M6
+  M1vsM6 <- differentialAbundance(sample1 = "M1", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # M2 vs M6
+  M2vsM6 <- differentialAbundance(sample1 = "M2", sample2 = "M6", list = list.tmp, parallel = FALSE)
+  # results
+  results <- list(T0vsM1 = T0vsM1, 
+                  T0vsM2 = T0vsM2,
+                  T0vsM6 = T0vsM6,
+                  M1vsM2 = M1vsM2,
+                  M1vsM6 = M1vsM6,
+                  M2vsM6 = M2vsM6)
+  return(results)
+}
+names(TRBC.abundance.results_4) <- unique(TCR$patient.id)
+```
+
+## PD-1+TIGIT+
+
+### Patient - P5
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P5
+patient <- "P5"
+registerDoMC(2)
+dt.P5 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = sign((dt.tmp$T0 - dt.tmp$M1))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+              from = c("1", "-1"), 
+              to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P5_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P5) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P6
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P6
+patient <- "P6"
+registerDoMC(2)
+dt.P6 <- foreach(i = 1:3) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = sign((dt.tmp$T0 - dt.tmp$M1))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+              from = c("1", "-1"), 
+              to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P6_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P6) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P7
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P7
+patient <- "P7"
+registerDoMC(2)
+dt.P7 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P7_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting 
+bind_rows(dt.P7) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P8
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P8
+patient <- "P8"
+registerDoMC(2)
+dt.P8 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P8_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P8) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P14
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P14
+patient <- "P14"
+registerDoMC(2)
+dt.P14 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P14_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P14) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P15
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P15
+patient <- "P15"
+registerDoMC(2)
+dt.P15 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P15_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P15) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P16
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P16
+patient <- "P16"
+registerDoMC(2)
+dt.P16 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1,contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P16_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P16) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P18
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P18
+patient <- "P18"
+registerDoMC(2)
+dt.P18 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P18_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P18) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P19
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P19
+patient <- "P19"
+registerDoMC(2)
+dt.P19 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P19_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P19) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P21
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P21
+patient <- "P21"
+registerDoMC(2)
+dt.P21 <- foreach(i = 1:4) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_1[[patient]], TRBC.abundance.results_1[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "TIGIT+"){
+      list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    }else if(c("PD-1+TIGIT+", "PD-1+", "TIGIT+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+```{r P21_DPOS_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P21) %>%
+  filter(fraction == "PD-1+TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P22
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P22
+patient <- "P22"
+registerDoMC(2)
+dt.P22 <- foreach(i = 1:2) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("PD-1+", "PD-1-TIGIT-")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    if(c("PD-1+", "PD-1-TIGIT-")[i] == "PD-1+"){
+      list.tmp <- list(TRAC.abundance.results_2[[patient]], TRBC.abundance.results_2[[patient]])[[j]]
+    }else if(c("PD-1+", "PD-1-TIGIT-")[i] == "PD-1-TIGIT-"){
+      list.tmp <- list(TRAC.abundance.results_4[[patient]], TRBC.abundance.results_4[[patient]])[[j]]
+    }
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+
+No PD-1+TIGIT+ sample (T0 & M1).  
+
+### Patient - P23
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Patient - P23
+patient <- "P23"
+registerDoMC(2)
+dt.P23 <- foreach(i = 1) %dopar%
+{
+  ##- variable
+  TCR.pData %>% 
+    filter(fraction.desc == c("TIGIT+")[i]) %>% 
+    filter(patient.id == patient) -> pData.tmp
+  dt.tmp <- foreach(j = 1:2) %do%
+  {
+    TRC <- c("TRAC", "TRBC")[j]
+    list.tmp <- list(TRAC.abundance.results_3[[patient]], TRBC.abundance.results_3[[patient]])[[j]]
+    ##- TCR
+    TCR.exprs %>% filter(QIAGEN.id %in% pData.tmp$QIAGEN.id, chain == TRC) -> TCR
+    merge(TCR, TCR.pData, by = "QIAGEN.id") %>% mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) -> TCR
+    ##- proportion
+    dt.tmp <- foreach(k = unique(TCR$sequence), .combine = rbind) %do%
+    {
+      T0 <- TCR %>% filter(time.point == "T0", sequence == k) %>% pull(freq.after.filtering)
+      T0 <- ifelse(is_empty(T0), 0, T0)
+      M1 <- TCR %>% filter(time.point == "M1", sequence == k) %>% pull(freq.after.filtering)
+      M1 <- ifelse(is_empty(M1), 0, M1)
+      contrast <- ifelse(k %in% list.tmp$T0vsM1$sequence, "T0 vs M1", "")
+      return(data.table(sequence = k, T0 = T0, M1 = M1, contrast = contrast))
+    }
+    dt.tmp %>%
+      mutate(patient.id = patient, 
+             fraction = unique(TCR$fraction.desc), 
+             outcome = unique(TCR$outcome), 
+             chain = unique(TCR$chain), 
+             cdr3aa = sapply(str_split(sequence, "_"), function(x) x[1]),
+             cdr3nt = sapply(str_split(sequence, "_"), function(x) x[2]),
+             v_genes = sapply(str_split(sequence, "_"), function(x) x[3]),
+             j_genes = sapply(str_split(sequence, "_"), function(x) x[4]),
+             cluster = paste(sign((dt.tmp$T0 - dt.tmp$M1)))) %>% 
+      mutate(cluster = plyr::mapvalues(cluster, 
+                 from = c("1", "-1"), 
+                 to = c("contracting", "expanding"))) %>%
+      mutate(cluster = ifelse(contrast == "", "non-expanding/contracting", cluster)) %>% 
+      mutate(cluster = ifelse(cluster == "expanding" & T0 == 0, "emerging", cluster)) %>%
+      mutate(cluster = factor(cluster, levels = c("emerging", "expanding", "contracting", "non-expanding/contracting"))) %>%
+      return()
+  }
+  return(bind_rows(dt.tmp))
+}
+```
+
+No PD-1+TIGIT+ sample (T0 & M1).  
+
+
+## PD-1+
+
+### Patient - P5
+
+```{r P5_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P5) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P6
+
+No PD-1+ sample (T0 & M1).  
+
+### Patient - P7
+
+```{r P7_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting 
+bind_rows(dt.P7) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P8
+
+```{r P8_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P8) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P14
+
+```{r P14_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P14) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P15
+
+```{r P15_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P15) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P16
+
+```{r P16_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P16) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P18
+
+```{r P18_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P18) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P19
+
+```{r P19_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P19) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P21
+
+```{r P21_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P21) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P22
+
+```{r P22_PD1_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P22) %>%
+  filter(fraction == "PD-1+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P23
+
+No PD-1+ sample (T0 & M1).  
+
+
+## TIGIT+
+
+### Patient - P5
+
+```{r P5_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P5) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P6
+
+```{r P6_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P6) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P7
+
+```{r P7_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting 
+bind_rows(dt.P7) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P8
+
+```{r P8_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P8) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P14
+
+```{r P14_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P14) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P15
+
+```{r P15_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P15) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P16
+
+```{r P16_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P16) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P18
+
+```{r P18_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P18) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P19
+
+```{r P19_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P19) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P21
+
+```{r P21_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P21) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P22
+
+No TIGIT+ sample (T0 & M1).  
+
+### Patient - P23
+
+```{r P23_TIGIT_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P23) %>%
+  filter(fraction == "TIGIT+") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+
+## PD-1-TIGIT-
+
+### Patient - P5
+
+```{r P5_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P5) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P6
+
+```{r P6_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P6) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P7
+
+```{r P7_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting 
+bind_rows(dt.P7) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P8
+
+```{r P8_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P8) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P14
+
+```{r P14_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P14) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P15
+
+```{r P15_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P15) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P16
+
+```{r P16_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P16) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P18
+
+```{r P18_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P18) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P19
+
+```{r P19_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P19) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P21
+
+```{r P21_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P21) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P22
+
+```{r P22_DNEG_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Plotting
+bind_rows(dt.P22) %>%
+  filter(fraction == "PD-1-TIGIT-") %>%
+  reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
+  filter(variable != "M2" & variable != "M6") %>%
+  mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_line(aes(group = sequence, color = cluster, lty = chain)) +
+    scale_color_viridis_d(option = "A", begin = .2, end = .9, guide = FALSE) +
+    labs(y = "Frequency", color = NULL, lty = NULL) +
+    facet_wrap(~ cluster, ncol = 7) +
+    theme_bw() +
+    theme(legend.position = "bottom", 
+          axis.title.x = element_blank())
+```
+
+### Patient - P23
+
+No PD-1-TIGIT- sample (T0 & M1).  
+
+
+## Summary
+
+**TRAC**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=4, fig.height=8}
+dt <- list(bind_rows(dt.P5),
+           bind_rows(dt.P6),
+           bind_rows(dt.P7),
+           bind_rows(dt.P8),
+           bind_rows(dt.P14),
+           bind_rows(dt.P15),
+           bind_rows(dt.P16),
+           bind_rows(dt.P18),
+           bind_rows(dt.P19),
+           bind_rows(dt.P21),
+           bind_rows(dt.P22),
+           bind_rows(dt.P23))
+
+###--- % clonotypes
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  ggplot(aes(x = cluster, y = freq)) +
+    geom_boxplot(aes(fill = fraction)) +
+    scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+    labs(y = "TRAC - freq clonotypes", fill = "Fraction") +
+    ylim(c(0, 1)) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(angle = 60, hjust = 1)) -> plotA
+# plotA
+
+###--- clonotypes
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = cluster, y = n)) +
+  geom_boxplot(aes(fill = fraction)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  labs(y = "TRAC - # clonotypes", fill = "Fraction") +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotB
+# plotB
+
+###---  Boxplots
+# Cairo::Cairo(width = 6, height = 10, units = "in", file = here::here("manuscript", "figs", "tmp", ".png"), pointsize = 12, type = "png", bg = "white", dpi = 500)
+cowplot::plot_grid(plotA, plotB, ncol = 1, align = "v")
+# dev.off()
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Statistics - between fractions within each cluster (#)
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  group_by(cluster) %>%
+  do(tidy(kruskal.test(n ~ fraction, data = .))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+
+###--- Statistics - between fractions within each cluster (%)
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  group_by(cluster) %>%
+  do(tidy(kruskal.test(freq ~ fraction, data = .))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+###--- % clonotypes
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  ggplot(aes(x = fraction, y = freq)) +
+  geom_boxplot(aes(fill = fraction, alpha = outcome)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
+  facet_wrap(~ cluster, ncol = 4) +
+  labs(y = "freq clonotypes", fill = "Fraction", alpha = "Outcome") +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotA
+# plotA
+
+###--- % clonotypes
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  ggplot(aes(x = fraction, y = n)) +
+  geom_boxplot(aes(fill = fraction, alpha = outcome)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
+  facet_wrap(~ cluster, ncol = 4) +
+  labs(y = "# clonotypes", fill = "Fraction", alpha = "Outcome") +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotB
+#plotB
+
+###--- Global
+# Cairo::Cairo(width = 10, height = 8, units = "in", file = here::here("manuscript", "figs", "tmp", "Fig_4D.png"), pointsize = 12, type = "png", bg = "white", dpi = 500)
+cowplot::plot_grid(plotA, plotB, ncol = 1, align = "v")
+# dev.off()
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Statistics - between outcomes within each fraction & cluster (%)
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>% 
+  group_by(cluster, fraction) %>%
+  do(tidy(wilcox.test(freq ~ outcome, data = ., paired = FALSE))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+
+###--- Statistics - between outcomes within each fraction & cluster (n)
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  group_by(cluster, fraction) %>%
+  do(tidy(wilcox.test(n ~ outcome, data = ., paired = FALSE))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View("r")
+```
+
+*Table - # of patients per fraction*
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+TCR.pData %>%
+  filter(time.point == "T0") %>%
+  mutate(fraction = factor(fraction.desc, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) -> table.dt
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$outcome)))
+```
+
+*Table - NR - # of patients per cluster*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- 
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) -> table.dt
+
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$cluster, table.dt$outcome)[,,1]))
+```
+
+*Table - R - # of patients per cluster*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- 
+bind_rows(dt) %>%
+  filter(chain == "TRAC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) -> table.dt
+
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$cluster, table.dt$outcome)[,,2]))
+```
+
+
+**TRBC**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=4, fig.height=8}
+dt <- list(bind_rows(dt.P5),
+           bind_rows(dt.P7),
+           bind_rows(dt.P8),
+           bind_rows(dt.P14),
+           bind_rows(dt.P15),
+           bind_rows(dt.P16),
+           bind_rows(dt.P18),
+           bind_rows(dt.P19),
+           bind_rows(dt.P21),
+           bind_rows(dt.P22),
+           bind_rows(dt.P23))
+
+###--- % clonotypes
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  ggplot(aes(x = cluster, y = freq)) +
+    geom_boxplot(aes(fill = fraction)) +
+    scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+    labs(y = "TRBC - freq clonotypes", fill = "Fraction") +
+    ylim(c(0, 1)) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(angle = 60, hjust = 1)) -> plotA
+# plotA
+
+###--- clonotypes
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = cluster, y = n)) +
+  geom_boxplot(aes(fill = fraction)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  labs(y = "TRBC - # clonotypes", fill = "Fraction") +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotB
+# plotB
+
+###---  Boxplots
+# Cairo::Cairo(width = 6, height = 10, units = "in", file = here::here("manuscript", "figs", "tmp", "Fig_4Cb.png"), pointsize = 12, type = "png", bg = "white", dpi = 500)
+cowplot::plot_grid(plotA, plotB, ncol = 1, align = "v")
+# dev.off()
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Statistics - between fractions within each cluster (#)
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  group_by(cluster) %>%
+  do(tidy(kruskal.test(n ~ fraction, data = .))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+
+###--- Statistics - between fractions within each cluster (%)
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  group_by(cluster) %>%
+  do(tidy(kruskal.test(freq ~ fraction, data = .))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+###--- % clonotypes
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  ggplot(aes(x = fraction, y = freq)) +
+  geom_boxplot(aes(fill = fraction, alpha = outcome)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
+  facet_wrap(~ cluster, ncol = 4) +
+  labs(y = "freq clonotypes", fill = "Fraction", alpha = "Outcome") +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotA
+# plotA
+
+###--- % clonotypes
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  ggplot(aes(x = fraction, y = n)) +
+  geom_boxplot(aes(fill = fraction, alpha = outcome)) +
+  scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
+  scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
+  facet_wrap(~ cluster, ncol = 4) +
+  labs(y = "# clonotypes", fill = "Fraction", alpha = "Outcome") +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1)) -> plotB
+#plotB
+
+###--- Global
+# Cairo::Cairo(width = 10, height = 8, units = "in", file = here::here("manuscript", "figs", "tmp", "Fig_4D.png"), pointsize = 12, type = "png", bg = "white", dpi = 500)
+cowplot::plot_grid(plotA, plotB, ncol = 1, align = "v")
+# dev.off()
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Statistics - between outcomes within each fraction & cluster (%)
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(total = sum(n)) %>%
+  mutate(freq = round(n / total, 2)) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>% 
+  group_by(cluster, fraction) %>%
+  do(tidy(wilcox.test(freq ~ outcome, data = ., paired = FALSE))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View()
+
+###--- Statistics - between outcomes within each fraction & cluster (n)
+TCR.pData[!duplicated(TCR.pData$patient.id), ] -> t
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) %>%
+  group_by(cluster, fraction) %>%
+  do(tidy(wilcox.test(n ~ outcome, data = ., paired = FALSE))) %>%
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% View("r")
+```
+
+*Table - # of patients per fraction*
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+TCR.pData %>%
+  filter(time.point == "T0") %>%
+  mutate(fraction = factor(fraction.desc, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) -> table.dt
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$outcome)))
+```
+
+*Table - NR - # of patients per cluster*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- 
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) -> table.dt
+
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$cluster, table.dt$outcome)[,,1]))
+```
+
+*Table - R - # of patients per cluster*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- 
+bind_rows(dt) %>%
+  filter(chain == "TRBC") %>%
+  mutate(fraction = factor(fraction, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))) %>%
+  group_by(patient.id, fraction, cluster) %>%
+  summarize(n = n()) %>%
+  mutate(outcome = plyr::mapvalues(patient.id, from = t$patient.id, to = t$outcome)) -> table.dt
+
+data.table(fraction = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"),
+           as.data.frame.matrix(table(table.dt$fraction, table.dt$cluster, table.dt$outcome)[,,2]))
+```
+
+
+
+
+
+
+
