@@ -1,0 +1,344 @@
+---
+title: "- RNA-seq - QC -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 20th 2019*  
+*Update: January, 14th 2020*  
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(Biobase)
+library(limma)
+library(edgeR)
+library(here)
+```
+
+# Description & importing data
+______________________________
+
+RNA was extracted from **17 patients**. Alignment and quantification have been performed by Qiagen.  
+
+* 17 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22**, **P23**, **A9**, **B10**, **C11**, **D12** and **E13**;  
+
+* Five time points: **T0**, **M1**, **M2**, **W3** and **W9**;  
+
+* One treatment: **anti-PD1**;  
+
+* Four fractions: **PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**;  
+
+* Two outcomes: **NR** and **R**;  
+
+* Two batches.    
+
+According to Qiagen, some samples have small library sizes (in which mainly reads were > 55bp); and others have libraries of correct size but mostly with reads < 55 bp.  
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- RNA-seq - preprocessing
+##- sample.id
+here("data", "RNA", "RNAseq_samples_ID.xlsx") %>%
+  readxl::read_xlsx(sheet = 1, skip = 5) %>%
+  clean_names() -> RNAseq_sample.id
+
+##- RNA-seq - batch 1 (expression & pData)
+# Expression
+here("data", "RNA", "QIAseqRNA_17491.Summary.xlsx") %>%
+  readxl::read_xlsx(sheet = 2) -> RNAseq_batch1
+#- pData
+RNAseq_sample.id %>%
+  select(sample_number_1, well_location_2, sample_id_3, x4) %>%
+  rename(sample.number = sample_number_1, 
+         well.location = well_location_2, 
+         sample.id = sample_id_3, 
+         treatment = x4) %>% 
+  mutate(treatment = c(rep("anti-PD1", 80), rep("anti-PD1/CTLA4", 16)),
+         batch = "batch 1") -> RNAseq_pData_batch1
+#- QC
+here("data", "RNA", "QIAseqRNA_17491.Summary.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% na.omit() %>% t() -> RNAseq_QC_batch1
+colnames(RNAseq_QC_batch1) <- c(paste0("# ", RNAseq_QC_batch1[1, 1:11]), paste0("% ", RNAseq_QC_batch1[1, 12:19]))
+RNAseq_QC_batch1 <- RNAseq_QC_batch1[2:nrow(RNAseq_QC_batch1), ]
+rownames(RNAseq_QC_batch1) <- str_remove(string = rownames(RNAseq_QC_batch1), pattern = ".*[.]")
+rownames(RNAseq_QC_batch1) <- str_remove(string = rownames(RNAseq_QC_batch1), pattern = "_.*")
+rownames(RNAseq_QC_batch1) <- str_replace(string = rownames(RNAseq_QC_batch1), pattern = "TO", replacement = "T0")
+rownames(RNAseq_QC_batch1) <- str_replace(string = rownames(RNAseq_QC_batch1), pattern = "A9-MF-M1", replacement = "A9-MF-W3")
+rownames(RNAseq_QC_batch1) <- str_replace(string = rownames(RNAseq_QC_batch1), pattern = "A9-MF-M2", replacement = "A9-MF-W9")
+rownames(RNAseq_QC_batch1) <- str_replace(string = rownames(RNAseq_QC_batch1), pattern = "B10-CF-M1", replacement = "B10-CF-W3")
+length(intersect(rownames(RNAseq_QC_batch1), RNAseq_pData_batch1$sample.id)) # 96 samples
+RNAseq_QC_batch1 <- RNAseq_QC_batch1[RNAseq_pData_batch1$sample.id, ]
+RNAseq_QC_batch1 <- apply(RNAseq_QC_batch1, 2, as.numeric)
+rownames(RNAseq_QC_batch1) <- RNAseq_pData_batch1$sample.id
+#- pData final
+bind_cols(RNAseq_pData_batch1, as.tibble(RNAseq_QC_batch1)) -> RNAseq_sample.id_batch1
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+##- RNA-seq - batch 2 (expression & pData)
+# Expression
+here("data", "RNA", "QIAseqRNA_17692.Summary.xlsx") %>%
+  readxl::read_xlsx(sheet = 2) -> RNAseq_batch2
+#- pData
+RNAseq_sample.id %>%
+  select(sample_number_6, well_location_7, sample_id_8, x9) %>%
+  rename(sample.number = sample_number_6, 
+         well.location = well_location_7, 
+         sample.id = sample_id_8, 
+         treatment = x9) %>% 
+  mutate(treatment = c(rep("anti-PD1", 60), rep("anti-PD1/CTLA4", 36)),
+         batch = "batch 2") -> RNAseq_pData_batch2
+#- QC
+here("data", "RNA", "QIAseqRNA_17692.Summary.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% na.omit() %>% t() -> RNAseq_QC_batch2
+colnames(RNAseq_QC_batch2) <- c(paste0("# ", RNAseq_QC_batch2[1, 1:11]), paste0("% ", RNAseq_QC_batch2[1, 12:19]))
+RNAseq_QC_batch2 <- RNAseq_QC_batch2[2:nrow(RNAseq_QC_batch2), ]
+rownames(RNAseq_QC_batch2) <- str_remove(string = rownames(RNAseq_QC_batch2), pattern = ".*[.]")
+rownames(RNAseq_QC_batch2) <- str_remove(string = rownames(RNAseq_QC_batch2), pattern = "_.*")
+rownames(RNAseq_QC_batch2) <- str_replace(string = rownames(RNAseq_QC_batch2), pattern = "TO", replacement = "T0")
+rownames(RNAseq_QC_batch2) <- str_replace(string = rownames(RNAseq_QC_batch2), pattern = "PD12-KLW9-DNEG", replacement = "PD12-KL-W9-DNEG")
+rownames(RNAseq_QC_batch2) <- str_replace(string = rownames(RNAseq_QC_batch2), pattern = "-PD12-KL-T0-DNEG", replacement = "PD12-KL-T0-DNEG")
+length(intersect(rownames(RNAseq_QC_batch2), RNAseq_pData_batch2$sample.id)) # 96 samples
+RNAseq_QC_batch2 <- RNAseq_QC_batch2[RNAseq_pData_batch2$sample.id, ]
+RNAseq_QC_batch2 <- apply(RNAseq_QC_batch2, 2, as.numeric)
+rownames(RNAseq_QC_batch2) <- RNAseq_pData_batch2$sample.id
+#- pData final
+bind_cols(RNAseq_pData_batch2, as.tibble(RNAseq_QC_batch2)) -> RNAseq_sample.id_batch2
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- RNA-seq - merge & expressionSet
+#- pData
+bind_rows(RNAseq_sample.id_batch1, RNAseq_sample.id_batch2) %>% 
+  rowwise() %>%
+  mutate(patient.id = str_split(sample.id, pattern = "-")[[1]][1]) %>%
+  mutate(patient.id = ifelse(batch == "batch 1" & treatment == "anti-PD1", 
+                             paste0("P", patient.id), 
+                             ifelse(batch == "batch 2" & treatment == "anti-PD1/CTLA4", str_remove(patient.id, pattern = "P"), patient.id)),
+         time.point = str_split(sample.id, pattern = "-")[[1]][3],
+         fraction = str_split(sample.id, pattern = "-")[[1]][4]) %>% 
+  mutate(fraction.desc = str_replace_all(fraction, c("TIGIT" = "TIGIT+"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("PD1" = "PD-1+"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("DNEG" = "PD-1-TIGIT-"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("DPOS" = "PD-1+TIGIT+"))) -> pData
+pData$outcome <- c(rep("NR", 12), rep("NR", 8), rep("R", 12), rep("R", 12), rep("R", 12), rep("R", 12), rep("NR", 12), rep(NA, 12), rep(NA, 4), rep("R", 12), rep("R", 12), rep("R", 12), rep("NR", 12), rep("NR", 12), rep(NA, 36))
+rownames(pData) <- pData$sample.id
+pData %>% View("pData")
+
+#- fData
+identical(RNAseq_batch1$`gene id`, RNAseq_batch2$`gene id`) # FALSE (two more genes in batch2)
+bind_cols(RNAseq_batch2) %>%
+  select(`gene id`, `gene symbol`, `gene strand`, `chrom`, `loc 5' GRCh38`, `loc 3' GRCh38`, `control type`, `single exon`) -> fData
+rownames(fData) <- make.unique(fData$`gene symbol`)
+fData %>% View("fData")
+
+#- raw count matrix
+RNAseq_batch2$rowname <- make.unique(RNAseq_batch2$`gene symbol`)
+RNAseq_batch1$rowname <- make.unique(RNAseq_batch1$`gene symbol`)
+merge(RNAseq_batch2, RNAseq_batch1, by = "rowname", all.x = TRUE, all.y = TRUE) -> merge
+rownames(merge) <- merge$rowname
+exprs <- merge[, c(10:105, 114:209)]
+colnames(exprs) <- str_remove(string = colnames(exprs), pattern = ".*[.]")
+colnames(exprs) <- str_remove(string = colnames(exprs), pattern = "_.*")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "TO", replacement = "T0")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "A9-MF-M1", replacement = "A9-MF-W3")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "A9-MF-M2", replacement = "A9-MF-W9")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "B10-CF-M1", replacement = "B10-CF-W3")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "PD12-KLW9-DNEG", replacement = "PD12-KL-W9-DNEG")
+colnames(exprs) <- str_replace(string = colnames(exprs), pattern = "-PD12-KL-T0-DNEG", replacement = "PD12-KL-T0-DNEG")
+length(intersect(colnames(exprs), rownames(pData))) # 192 samples
+exprs %>% View("exprs")
+
+#- ExpressionSet
+fData <- as.data.frame(fData)
+pData <- as.data.frame(pData)
+pData <- pData[, c(1:5, 25:29, 6:24)]
+exprs <- as.data.frame(exprs)
+exprs <- exprs[rownames(fData), rownames(pData)]
+raw.countData <- new("ExpressionSet", exprs = exprs, 
+                     phenoData = new("AnnotatedDataFrame", pData), 
+                     featureData = new("AnnotatedDataFrame", fData))
+pData(raw.countData)$n.genes.on <- colSums(exprs(raw.countData) > 0, na.rm = TRUE)
+pData(raw.countData)$library.size <- colSums(exprs(raw.countData), na.rm = TRUE)
+raw.countData <- raw.countData[, which(raw.countData$treatment == "anti-PD1")] # remove anti-PD1 & anti-CTLA4 samples
+pData(raw.countData)$fraction.desc <- factor(x = pData(raw.countData)$fraction.desc, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))
+pData(raw.countData)$patient.id <- factor(x = pData(raw.countData)$patient.id, levels = c("P5", "P6", "P7", "P8", "P14", "P15", "P16", "P18", "P19", "P21", "P22", "P23"))
+pData(raw.countData)$time.point <- factor(x = pData(raw.countData)$time.point, levels = c("T0", "M1", "M2"))
+saveRDS(object = raw.countData, file = here("output", "RNA_raw_count.rds"))
+```
+
+There are **977 genes** (6 genomic DNA controls) and **140 samples**.  
+
+
+
+
+# Quality Control
+_________________
+
+## Raw count Data
+
+### Boxplot
+
+```{r boxplot_raw, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+###--- Boxplots / Raw Count
+raw.countData <- readRDS(file = here("output", "RNA_raw_count.rds"))
+pData(raw.countData) %>%
+  ggplot(aes(x = sample.id, y = library.size, fill = sample.id)) +
+    geom_bar(stat = "identity") + 
+    facet_wrap(~ batch, scales = "free_x") + 
+    labs(y = "Raw read count total", fill = NULL) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") -> plot1
+
+###--- Boxplots / log2-Raw Count
+data.table(reshape2::melt(log2(exprs(raw.countData) + 1)), batch = c(rep("batch 1", 78160), rep("batch 2", 58620))) %>%
+  ggplot(aes(x = variable, y = value, fill = variable)) +
+    geom_boxplot() +
+    facet_wrap(~ batch, scales = "free_x") + 
+    labs(y = "log2-read count", fill = NULL) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") -> plot2
+
+cowplot::plot_grid(plot1, plot2, ncol = 1, align = "v")
+```
+
+As observed by Qiagen, some samples have small library sizes - mainly in batch 2.  
+
+### Principal Component Analysis (PCA)
+
+```{r pca_raw_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=5, fig.height=5}
+###--- PCA
+pca <- prcomp(na.omit(exprs(raw.countData)), center = FALSE, scale = FALSE) # summary(pca) PC1 93.33% - PC2 2.55% - PC3 1.65%
+data.ggplot <- data.table(pca$rotation[, 1:3], pData(raw.countData))
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = sample.id), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank(), legend.position = "none")
+```
+```{r pca_raw_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=11.5, fig.height=18}
+###--- PCA
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = batch), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotA
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = patient.id), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotB
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = time.point), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = NULL) +
+    scale_color_brewer(palette = "Dark2") +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotC
+
+fraction.colors <- c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")
+names(fraction.colors) <- c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+")
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = fraction.desc), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotD
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = outcome), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = NULL) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotE
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = n.genes.on), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = "# detected\ngenes") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotF
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = library.size), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = "# mapped\nreads") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotG
+
+data.ggplot %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+    geom_point(aes(color = `% reads dropped, < 55 bp`), size = .8) +
+    labs(x = "PC1 93.33%", y = "PC2 2.55%", color = "% reads\ndropped <55bp") +
+    scale_colour_viridis_c() +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), axis.text = element_blank(), axis.ticks = element_blank()) -> plotH
+
+cowplot::plot_grid(plotA, plotB, plotC, plotD, plotE, plotF, plotG, plotH, ncol = 2, align = "v", labels = "AUTO")
+```
+
+PC1 is clearly driven by the library size.  
+
+### QC metrics  
+
+```{r QC_metrics, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=5, fig.height=4.5}
+###--- n.genes.on and library.size
+pData(raw.countData) %>%
+  ggplot(aes(x = n.genes.on, y = library.size, color = fraction.desc)) +
+    geom_point(size = .8) +
+    labs(x = "# detected genes", y = "# mapped reads", color = NULL) + 
+    xlim(c(0, 1000)) + ylim(c(0, 1.5e6)) +
+    geom_hline(yintercept = 70000, size = .2) + 
+    scale_color_manual(values = fraction.colors) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 12), legend.position = "bottom")
+```
+
+QC metrics seem to be good and consistent across samples (except some of them) w/  
+
+* about 750 detected genes per sample;  
+
+* about 5e+05 reads per sample.  
+
+Samples w/ **a library size smaller than 70000 reads** and **% reads dropped, < 55 bp above 55%** are removed leaving **121 samples** for downstream analyses.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Filtering
+pData(raw.countData) %>%
+  filter(library.size < 70000 | `% reads dropped, < 55 bp` > .55) %>% 
+  View() # in agreement w/ Qiagen QC - except from samples (subjective threshold)
+pData(raw.countData) %>%
+  filter(library.size < 70000 | `% reads dropped, < 55 bp` > .55) %>%
+  pull(sample.id) -> sample.id.r
+
+countData <- raw.countData[, setdiff(colnames(raw.countData), sample.id.r)]
+pData(countData) %>% View()
+pData(countData) %>% dim()
+saveRDS(object = countData, file = here("output", "RNA_count.rds"))
+```
+
+
