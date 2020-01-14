@@ -1,0 +1,1364 @@
+---
+title: "- TCR-seq - EDA -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 28th 2019*  
+*Update: January, 14th 2020*   
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(here)
+library(VennDiagram)
+library(gridExtra)
+library(ComplexHeatmap)
+library(doMC)
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+load(here("output", "2019-02-28_TCR-seq_EDA.RData"))
+# save.image(here("output", "2019-02-28_TCR-seq_EDA.RData"))
+```
+
+# Description & importing data
+______________________________
+
+RNA was extracted from **12 patients**. Alignment and quantification of TCR sequences have been performed by QIAGEN  
+
+* 12 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22** and **P23**;  
+
+* Four time points: **T0**, **M1**, **M2** & **M6**;  
+
+* One treatment: **anti-PD1**;  
+
+* Four fractions: **PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**;  
+
+* Two outcomes: **NR** and **R**;  
+
+* Three batches.  
+
+QC have already been performed - please look at the TCR-QC section. **Fourteen samples** have been removed.  
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Importation (anti-PD1 treatment only)
+here("output", "TCR_pData.rds") %>%
+  readRDS() -> TCR.pData
+here("output", "TCR_count.rds") %>%
+  readRDS() -> TCR.exprs
+```
+
+
+
+
+# Exploratory analysis
+______________________
+
+## Extracting productive sequences
+
+QC have already been performed. Despite we are interested in just the complementarity determining region 3 (CDR3) amino acid sequences, we chose not to aggregate neither duplicate amino acid sequences nor duplicate nucleotide sequences. 
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Extracting productive sequences - aggregate samples having the same cdr3aa, cdr3nt and V/J-regions
+TCR.exprs %>%
+  group_by(QIAGEN.id, chain, cdr3nt, cdr3aa, `V-region`, `J-region`) %>%
+  summarise(frequency = sum(freq.after.filtering), 
+            `UMIs with >= 1 reads` = sum(`UMIs with >= 1 reads`),
+            `UMIs with >= 2 reads` = sum(`UMIs with >= 2 reads`),
+            `UMIs with >= 3 reads` = sum(`UMIs with >= 3 reads`),
+            `UMIs with >= 4 reads` = sum(`UMIs with >= 4 reads`),
+            `UMIs with >= 5 reads` = sum(`UMIs with >= 5 reads`),
+            `UMIs with >= 6 reads` = sum(`UMIs with >= 6 reads`),
+            `UMIs with >= 7 reads` = sum(`UMIs with >= 7 reads`),
+            total.reads = sum(`# reads`),
+            total.UMIs = sum(total.UMIs)) %>%
+  arrange(QIAGEN.id, chain, desc(`UMIs with >= 1 reads`)) -> productive.aa
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5}
+productive.aa
+```
+
+
+## Summary statistics
+
+The clonality score is derived from the Shannon entropy, which is calculated from the frequencies of all productive sequences divided by the logarithm of the total number of unique productive sequences. This normalized entropy value is then inverted (1 - normalized entropy) to produce the clonality metric.  
+The Gini coefficient is an alternative metric used to calculate repertoire diversity.  
+Both Gini coefficient and clonality are reported on a scale from 0 to 1 where 0 indicates all sequences have the same frequency and 1 indicates the repertoire is dominated by a single sequence.  
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+###--- Summary statistics
+productive.aa %>%
+  filter(chain == "TRAC" | chain == "TRBC") %>% 
+  group_by(QIAGEN.id, chain) %>%
+  summarise(total.reads = sum(total.reads),
+            total.UMIs = sum(total.UMIs),
+            unique.productive = n(),
+            entropy = -sum(frequency * log2(frequency), na.rm = TRUE),
+            gini.coef = ineq::Gini(frequency)) %>%
+  mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) -> dt
+dt <- merge(dt, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc")], by = "QIAGEN.id")
+```
+```{r summary_statistics, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.height=6, fig.width=5.5}
+###--- Summary statistics - # clonotypes
+dt %>%
+  filter(chain == "TRAC") %>%
+  select(QIAGEN.id, sample.id, treatment, batch, patient.id, time.point, fraction.desc, unique.productive) -> TRAC
+dt %>%
+  filter(chain == "TRBC") %>%
+  select(QIAGEN.id, sample.id, treatment, batch, patient.id, time.point, fraction.desc, unique.productive) -> TRBC
+merge(TRAC, TRBC, by = "sample.id", all = T) %>%
+  select(QIAGEN.id.x, sample.id, treatment.x, batch.x, patient.id.x, time.point.x, fraction.desc.x, unique.productive.x, unique.productive.y) %>%
+  rename(QIAGEN.id = QIAGEN.id.x,
+         treatment = treatment.x, 
+         batch = batch.x, 
+         patient.id = patient.id.x, 
+         time.point = time.point.x, 
+         fraction.desc = fraction.desc.x, 
+         unique.productive.TRAC = unique.productive.x,
+         unique.productive.TRBC = unique.productive.y) -> data.ggplot
+
+fraction.colors <- c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")
+names(fraction.colors) <- c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+")
+data.ggplot %>%
+  mutate(unique.productive.TRBC = ifelse(is.na(unique.productive.TRBC), 1, unique.productive.TRBC)) %>%
+  ggplot(aes(x = unique.productive.TRAC, y = unique.productive.TRBC, color = fraction.desc)) +
+    geom_point(size = .6) +
+    facet_wrap(~ time.point, ncol = 2, scales = "free") +
+    scale_x_log10() +
+    scale_y_log10() +
+    labs(x = "log10(# unique productive TRAC)", y = "log10(# unique productive TRBC)", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme(legend.position = "top", 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Summary statistics - # read pairs
+TCR.pData %>%
+  ggplot(aes(x = `# read pairs from gene TRAC`, y = `# read pairs from gene TRBC`, color = fraction.desc)) +
+    geom_point(size = .6) +
+    facet_wrap(~ time.point, ncol = 2, scales = "free") +
+    labs(x = "# read pairs from gene TRAC", y = "# read pairs from gene TRBC", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme(legend.position = "top", 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Summary statistics - # UMIs
+TCR.pData %>%
+  ggplot(aes(x = `UMIs TRAC`, y = `UMIs TRBC`, color = fraction.desc)) +
+    geom_point(size = .6) +
+    facet_wrap(~ time.point, ncol = 2, scales = "free") +
+    labs(x = "# UMIs from gene TRAC", y = "# UMIs from gene TRBC", color = NULL) +
+    scale_color_manual(values = fraction.colors) +
+    theme(legend.position = "top", 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+
+### TRAC
+
+**Table 1: TRAC clonotypes**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5}
+###--- Table
+dt %>%
+  arrange(batch, sample.number) %>%
+  filter(chain == "TRAC") %>%
+  select(QIAGEN.id, sample.id, patient.id, time.point, treatment, batch, fraction.desc, total.reads, total.UMIs, unique.productive, entropy, gini.coef, clonality)
+```
+
+**Figure 1: # of unique TRAC sequences across fraction, time point and treatment**
+
+```{r TRAC_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=3, fig.height=6}
+###--- Figure
+dt %>% 
+  filter(chain == "TRAC") %>%
+  ggplot(aes(x = fraction.desc, y = unique.productive)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# unique TRAC sequences") +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Figure (2)
+TCR.pData %>% 
+  ggplot(aes(x = fraction.desc, y = `# read pairs from gene TRAC`)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# read pairs from gene TRAC")  +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Figure (3)
+TCR.pData %>% 
+  ggplot(aes(x = fraction.desc, y = `UMIs TRAC`)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# UMIs from gene TRAC") +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+```{r TRAC_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=5, fig.height=3.5}
+###--- Figure
+dt %>% 
+  filter(chain == "TRAC") %>%
+  ggplot(aes(x = fraction.desc, y = unique.productive)) +
+    geom_boxplot(aes(fill = time.point), outlier.size = .3) +
+    scale_fill_brewer(palette = "Dark2") +
+    facet_grid(~ treatment, scales = "free_y") +
+    labs(y = "# unique TRAC sequences", fill = NULL) +
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+
+**Figure 2: TRAC clonality across fraction, time point and treatment**
+
+```{r TRAC_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=3, fig.height=6}
+###--- Figure
+dt %>% 
+  filter(chain == "TRAC") %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(color = fraction.desc), shape = 21, size = .3) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "TRAC clonality")  +
+    scale_color_manual(values = fraction.colors) + 
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+dt %>% 
+  filter(chain == "TRAC") %>%
+  mutate(outcome = plyr::mapvalues(x = QIAGEN.id, from = TCR.pData$QIAGEN.id, to = TCR.pData$outcome)) %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+    geom_boxplot(aes(fill = fraction.desc, alpha = outcome), outlier.shape = NA) +
+    geom_jitter(aes(color = fraction.desc), shape = 21, size = .3) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "TRAC clonality") +
+    scale_fill_manual(values = fraction.colors) +
+    scale_color_manual(values = fraction.colors) +
+    scale_alpha_manual(values = c('NR' = 1, 'R' = .3)) +
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+
+**Figure 3: TRAC proportion across fraction, time point and treatment**
+
+```{r TRAC_4, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+###--- Figure
+productive.aa %>%
+  filter(chain == "TRAC") %>% 
+  group_by(QIAGEN.id, chain) %>%
+  summarise(total.reads = sum(total.reads),
+            total.UMIs = sum(total.UMIs),
+            unique.productive = n(),
+            entropy = -sum(frequency * log2(frequency), na.rm = TRUE),
+            gini.coef = ineq::Gini(frequency),
+            Top10 = sum(frequency[1:10]) * 100,
+            Top20 = sum(frequency[11:20]) * 100,
+            Others = sum(frequency[21:n()]) * 100) %>%
+  mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) %>% 
+  filter(unique.productive >= 21) -> data.ggplot
+data.ggplot <- merge(data.ggplot, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc", "outcome")], by = "QIAGEN.id")
+
+data.ggplot %>% 
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id) %>%
+  reshape2::melt(id.vars = c("sample.id", "treatment", "time.point", "fraction.desc", "patient.id")) %>% 
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9) +
+    facet_wrap(~ patient.id + fraction.desc, ncol = 8, scales = "free_x") +
+    labs(y = "% TRAC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+###--- Global (all patients)
+std <- function(x) sd(x)/sqrt(length(x))
+data.ggplot %>% 
+  filter(treatment == "anti-PD1") %>%
+  filter(time.point != "M6") %>%
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id, outcome) %>% 
+  group_by(time.point, fraction.desc) %>%
+  summarise(Top10.mean = mean(Top10),
+            Top20.mean = mean(Top20),
+            Others.mean = mean(Others),
+            Top10.sd = std(Top10),
+            Top20.sd = std(Top20),
+            Others.sd = std(Others)) -> data.ggplot.global
+data.ggplot.mean <- data.ggplot.global[, 1:5] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.std <- data.ggplot.global[, c(1:2, 6:8)] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.position <- data.ggplot.global %>%
+  rowwise() %>%
+  mutate(Top10.pos = 100,
+         Top20.pos = sum(Top20.mean, Others.mean),
+         Others.pos = Others.mean) %>%
+  select(time.point, fraction.desc, Top10.pos, Top20.pos, Others.pos) %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.mean$value.std <- data.ggplot.std$value
+data.ggplot.mean$value.position <- data.ggplot.position$value
+
+data.ggplot.mean %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRAC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotA
+
+###--- Global (NR)
+std <- function(x) sd(x)/sqrt(length(x))
+data.ggplot %>% 
+  filter(time.point != "M6") %>%
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id, outcome) %>% 
+  group_by(time.point, fraction.desc, outcome) %>%
+  summarise(Top10.mean = mean(Top10),
+            Top20.mean = mean(Top20),
+            Others.mean = mean(Others),
+            Top10.sd = std(Top10),
+            Top20.sd = std(Top20),
+            Others.sd = std(Others)) -> data.ggplot.global
+data.ggplot.mean <- data.ggplot.global[, 1:6] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.std <- data.ggplot.global[, c(1:3, 7:9)] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.position <- data.ggplot.global %>%
+  rowwise() %>%
+  mutate(Top10.pos = 100,
+         Top20.pos = sum(Top20.mean, Others.mean),
+         Others.pos = Others.mean) %>%
+  select(time.point, fraction.desc, Top10.pos, Top20.pos, Others.pos, outcome) %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.mean$value.std <- data.ggplot.std$value
+data.ggplot.mean$value.position <- data.ggplot.position$value
+
+data.ggplot.mean %>%
+  filter(outcome == "NR") %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRAC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotB
+
+###--- Global (R)
+data.ggplot.mean %>%
+  filter(outcome == "R") %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRAC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotC
+
+cowplot::plot_grid(plotA, plotB, plotC, ncol = 1)
+```
+
+### TRBC
+
+**Table 1: TRBC clonotypes**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5}
+###--- Table
+dt %>%
+  arrange(batch, sample.number) %>%
+  filter(chain == "TRBC") %>%
+  select(QIAGEN.id, sample.id, patient.id, time.point, treatment, batch, fraction.desc, total.reads, total.UMIs, unique.productive, entropy, gini.coef, clonality)
+```
+
+**Figure 1: # of unique TRBC sequences across fraction, time point and treatment**
+
+```{r TRBC_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=3, fig.height=6}
+###--- Figure
+dt %>% 
+  filter(chain == "TRBC") %>%
+  ggplot(aes(x = fraction.desc, y = unique.productive)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# unique TRBC sequences") +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Figure (2)
+TCR.pData %>% 
+  ggplot(aes(x = fraction.desc, y = `# read pairs from gene TRBC`)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# read pairs from gene TRBC")  +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+
+###--- Figure (3)
+TCR.pData %>% 
+  ggplot(aes(x = fraction.desc, y = `UMIs TRBC`)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(fill = fraction.desc), shape = 21, size = .5) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "# UMIs from gene TRBC") +
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+```{r TRBC_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=5, fig.height=3.5}
+###--- Figure
+dt %>% 
+  filter(chain == "TRBC") %>%
+  ggplot(aes(x = fraction.desc, y = unique.productive)) +
+    geom_boxplot(aes(fill = time.point), outlier.size = .3) +
+    scale_fill_brewer(palette = "Dark2") +
+    facet_grid(~ treatment, scales = "free_y") +
+    labs(y = "# unique TRBC sequences", fill = NULL) +
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+
+**Figure 2: TRBC clonality across fraction, time point and treatment**
+
+```{r TRBC_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=3, fig.height=6}
+###--- Figure
+dt %>% 
+  filter(chain == "TRBC") %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+    geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
+    geom_jitter(aes(color = fraction.desc), shape = 21, size = .3) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "TRBC clonality")  +
+    scale_color_manual(values = fraction.colors) + 
+    scale_fill_manual(values = fraction.colors) + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+
+dt %>% 
+  filter(chain == "TRBC") %>%
+  mutate(outcome = plyr::mapvalues(x = QIAGEN.id, from = TCR.pData$QIAGEN.id, to = TCR.pData$outcome)) %>%
+  ggplot(aes(x = fraction.desc, y = clonality)) +
+    geom_boxplot(aes(fill = fraction.desc, alpha = outcome), outlier.shape = NA) +
+    geom_jitter(aes(color = fraction.desc), shape = 21, size = .3) +
+    facet_grid(time.point ~ treatment, scales = "free_y") +
+    labs(y = "TRBC clonality") +
+    scale_fill_manual(values = fraction.colors) +
+    scale_color_manual(values = fraction.colors) +
+    scale_alpha_manual(values = c('NR' = 1, 'R' = .3)) +
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+
+**Figure 3: TRBC proportion across fraction, time point and treatment**
+
+```{r TRBC_4, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+###--- Figure
+productive.aa %>%
+  filter(chain == "TRBC") %>% 
+  group_by(QIAGEN.id, chain) %>%
+  summarise(total.reads = sum(total.reads),
+            total.UMIs = sum(total.UMIs),
+            unique.productive = n(),
+            entropy = -sum(frequency * log2(frequency), na.rm = TRUE),
+            gini.coef = ineq::Gini(frequency),
+            Top10 = sum(frequency[1:10]) * 100,
+            Top20 = sum(frequency[11:20]) * 100,
+            Others = sum(frequency[21:n()]) * 100) %>%
+  mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) %>% 
+  filter(unique.productive >= 21) -> data.ggplot
+data.ggplot <- merge(data.ggplot, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatment", "batch", "patient.id", "time.point", "fraction.desc", "outcome")], by = "QIAGEN.id")
+
+data.ggplot %>% 
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id) %>%
+  reshape2::melt(id.vars = c("sample.id", "treatment", "time.point", "fraction.desc", "patient.id")) %>% 
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9) +
+    facet_wrap(~ patient.id + fraction.desc, ncol = 8, scales = "free_x") +
+    labs(y = "% TRBC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black"))
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+###--- Global (all patients)
+std <- function(x) sd(x)/sqrt(length(x))
+data.ggplot %>% 
+  filter(treatment == "anti-PD1") %>%
+  filter(time.point != "M6") %>%
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id, outcome) %>% 
+  group_by(time.point, fraction.desc) %>%
+  summarise(Top10.mean = mean(Top10),
+            Top20.mean = mean(Top20),
+            Others.mean = mean(Others),
+            Top10.sd = std(Top10),
+            Top20.sd = std(Top20),
+            Others.sd = std(Others)) -> data.ggplot.global
+data.ggplot.mean <- data.ggplot.global[, 1:5] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.std <- data.ggplot.global[, c(1:2, 6:8)] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.position <- data.ggplot.global %>%
+  rowwise() %>%
+  mutate(Top10.pos = 100,
+         Top20.pos = sum(Top20.mean, Others.mean),
+         Others.pos = Others.mean) %>%
+  select(time.point, fraction.desc, Top10.pos, Top20.pos, Others.pos) %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc"))
+data.ggplot.mean$value.std <- data.ggplot.std$value
+data.ggplot.mean$value.position <- data.ggplot.position$value
+
+data.ggplot.mean %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRBC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotA
+
+###--- Global (NR)
+std <- function(x) sd(x)/sqrt(length(x))
+data.ggplot %>% 
+  filter(time.point != "M6") %>%
+  select(sample.id, treatment, time.point, fraction.desc, Top10, Top20, Others, patient.id, outcome) %>% 
+  group_by(time.point, fraction.desc, outcome) %>%
+  summarise(Top10.mean = mean(Top10),
+            Top20.mean = mean(Top20),
+            Others.mean = mean(Others),
+            Top10.sd = std(Top10),
+            Top20.sd = std(Top20),
+            Others.sd = std(Others)) -> data.ggplot.global
+data.ggplot.mean <- data.ggplot.global[, 1:6] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.std <- data.ggplot.global[, c(1:3, 7:9)] %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.position <- data.ggplot.global %>%
+  rowwise() %>%
+  mutate(Top10.pos = 100,
+         Top20.pos = sum(Top20.mean, Others.mean),
+         Others.pos = Others.mean) %>%
+  select(time.point, fraction.desc, Top10.pos, Top20.pos, Others.pos, outcome) %>%
+  reshape2::melt(id.vars = c("time.point", "fraction.desc", "outcome"))
+data.ggplot.mean$value.std <- data.ggplot.std$value
+data.ggplot.mean$value.position <- data.ggplot.position$value
+
+data.ggplot.mean %>%
+  filter(outcome == "NR") %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRBC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotB
+
+###--- Global (R)
+data.ggplot.mean %>%
+  filter(outcome == "R") %>%
+  ggplot(aes(x = time.point, y = value)) +
+    geom_bar(aes(fill = variable), stat = "identity") +
+    scale_fill_viridis_d(option = "D", begin = .1, end = .9, labels = c("Top10.mean" = "Top10", "Top20.mean" = "Top20", "Others.mean" = "Others")) +
+    facet_wrap(~ fraction.desc, ncol = 4, scales = "free_x") +
+    geom_errorbar(aes(ymin = value.position - value.std, ymax = value.position + value.std), colour = "black", width = .1) +
+    scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) +
+    labs(y = "% TRBC proportion", fill = NULL) + 
+    theme(axis.title.x = element_blank(), 
+          axis.text.x = element_text(angle = 60, hjust = 1), 
+          panel.background = element_rect(fill = "white"),
+          axis.line = element_line(color = "black")) -> plotC
+
+cowplot::plot_grid(plotA, plotB, plotC, ncol = 1)
+```
+
+
+## Overlap across fractions within time points
+
+Let"s look at overlap of complementarity determining region 3 (CDR3) nucleotide sequences (whatever the patient).  
+
+Morisita"s overlap index, named after Masaaki Morisita, is a statistical __measure of dispersion__ of individuals in a population. It is used to compare overlap among samples (Morisita 1959). This formula is based on the assumption that increasing the size of the samples will increase the diversity because it will include different habitats (i.e. different faunas).  
+
+### T0
+
+```{r morisita_T0, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=20, fig.height=8}
+###--- Morisita"s index - TRAC - T0
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRAC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "T0") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRAC
+mat.TRAC[is.na(mat.TRAC)] <- 0
+rownames(mat.TRAC) <- mat.TRAC$sequence
+mat.TRAC <- mat.TRAC[, 2:ncol(mat.TRAC)]
+dist.TRAC <- vegan::vegdist(t(mat.TRAC), method = "morisita")
+dist.TRAC <- 1 - as.matrix(dist.TRAC)
+diag(dist.TRAC) <- 0
+matrix.melted <- reshape2::melt(dist.TRAC)
+
+TCR.pData %>% filter(time.point == "T0") -> pData.TRAC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = pData.TRAC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    facet_wrap(~ "TRAC") +
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotA
+
+
+###--- Morisita"s index - TRBC - T0
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRBC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "T0") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRBC
+mat.TRBC[is.na(mat.TRBC)] <- 0
+rownames(mat.TRBC) <- mat.TRBC$sequence
+mat.TRBC <- mat.TRBC[, 2:ncol(mat.TRBC)]
+dist.TRBC <- vegan::vegdist(t(mat.TRBC), method = "morisita")
+dist.TRBC <- 1 - as.matrix(dist.TRBC)
+diag(dist.TRBC) <- 0
+matrix.melted <- reshape2::melt(dist.TRBC)
+
+TCR.pData %>% filter(time.point == "T0") -> pData.TRBC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = pData.TRBC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    facet_wrap(~ "TRBC") +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotB
+
+cowplot::plot_grid(plotA, plotB, ncol = 2)
+#Cairo::Cairo(width = 17.5, height = 8, units = "in", file = here::here("manuscript", "figs", "tmp", "Fig_Morisita_M1.png"), pointsize = 12, type = "png", bg = "white", dpi = 500)
+#cowplot::plot_grid(plotA, plotB, ncol = 2)
+#dev.off()
+```
+```{r vennDiagram_T0, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+###--- venn diagram - TRAC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotA <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+###--- venn diagram - TRBC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "T0", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotB <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+cowplot::plot_grid(gTree(children = plotA), gTree(children = plotB), labels = c("TRAC", "TRBC"))
+```
+
+### M1
+
+```{r morisita_M1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=20, fig.height=8}
+###--- Morisita"s index - TRAC - M1
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRAC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M1") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRAC
+mat.TRAC[is.na(mat.TRAC)] <- 0
+rownames(mat.TRAC) <- mat.TRAC$sequence
+mat.TRAC <- mat.TRAC[, 2:ncol(mat.TRAC)]
+dist.TRAC <- vegan::vegdist(t(mat.TRAC), method = "morisita")
+dist.TRAC <- 1 - as.matrix(dist.TRAC)
+diag(dist.TRAC) <- 0
+matrix.melted <- reshape2::melt(dist.TRAC)
+
+TCR.pData %>% filter(time.point == "M1") -> pData.TRAC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = pData.TRAC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotA
+
+
+###--- Morisita"s index - TRBC - M1
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRBC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M1") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRBC
+mat.TRBC[is.na(mat.TRBC)] <- 0
+rownames(mat.TRBC) <- mat.TRBC$sequence
+mat.TRBC <- mat.TRBC[, 2:ncol(mat.TRBC)]
+dist.TRBC <- vegan::vegdist(t(mat.TRBC), method = "morisita")
+dist.TRBC <- 1 - as.matrix(dist.TRBC)
+diag(dist.TRBC) <- 0
+matrix.melted <- reshape2::melt(dist.TRBC)
+
+TCR.pData %>% filter(time.point == "M1") -> pData.TRBC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = pData.TRBC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotB
+
+cowplot::plot_grid(plotA, plotB, ncol = 2, labels = c("TRAC", "TRBC"))
+```
+```{r vennDiagram_M1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+###--- venn diagram - TRAC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotA <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+###--- venn diagram - TRBC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M1", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotB <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+cowplot::plot_grid(gTree(children = plotA), gTree(children = plotB), labels = c("TRAC", "TRBC"))
+```
+
+### M2
+
+```{r morisita_M2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=17, fig.height=7}
+###--- Morisita"s index - TRAC - M2
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRAC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M2") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRAC
+mat.TRAC[is.na(mat.TRAC)] <- 0
+rownames(mat.TRAC) <- mat.TRAC$sequence
+mat.TRAC <- mat.TRAC[, 2:ncol(mat.TRAC)]
+dist.TRAC <- vegan::vegdist(t(mat.TRAC), method = "morisita")
+dist.TRAC <- 1 - as.matrix(dist.TRAC)
+diag(dist.TRAC) <- 0
+matrix.melted <- reshape2::melt(dist.TRAC)
+
+TCR.pData %>% filter(time.point == "M2") -> pData.TRAC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = pData.TRAC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotA
+
+
+###--- Morisita"s index - TRBC - M2
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRBC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M2") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRBC
+mat.TRBC[is.na(mat.TRBC)] <- 0
+rownames(mat.TRBC) <- mat.TRBC$sequence
+mat.TRBC <- mat.TRBC[, 2:ncol(mat.TRBC)]
+dist.TRBC <- vegan::vegdist(t(mat.TRBC), method = "morisita")
+dist.TRBC <- 1 - as.matrix(dist.TRBC)
+diag(dist.TRBC) <- 0
+matrix.melted <- reshape2::melt(dist.TRBC)
+
+TCR.pData %>% filter(time.point == "M2") -> pData.TRBC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = pData.TRBC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotB
+
+cowplot::plot_grid(plotA, plotB, ncol = 2, labels = c("TRAC", "TRBC"))
+```
+```{r vennDiagram_M2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+###--- venn diagram - TRAC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotA <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+###--- venn diagram - TRBC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M2", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotB <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+cowplot::plot_grid(gTree(children = plotA), gTree(children = plotB), labels = c("TRAC", "TRBC"))
+```
+
+### M6
+
+```{r morisita_M6, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=14, fig.height=5.6}
+###--- Morisita"s index - TRAC - M6
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRAC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M6") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRAC
+mat.TRAC[is.na(mat.TRAC)] <- 0
+rownames(mat.TRAC) <- mat.TRAC$sequence
+mat.TRAC <- mat.TRAC[, 2:ncol(mat.TRAC)]
+dist.TRAC <- vegan::vegdist(t(mat.TRAC), method = "morisita")
+dist.TRAC <- 1 - as.matrix(dist.TRAC)
+diag(dist.TRAC) <- 0
+matrix.melted <- reshape2::melt(dist.TRAC)
+
+TCR.pData %>% filter(time.point == "M6") -> pData.TRAC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = pData.TRAC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRAC$QIAGEN.id, to = paste(pData.TRAC$patient.id, pData.TRAC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotA
+
+
+###--- Morisita"s index - TRBC - M6
+productive.aa %>%
+  ungroup() %>%
+  filter(chain == "TRBC") %>%
+  filter(QIAGEN.id %in% (TCR.pData %>% filter(time.point == "M6") %>% pull(QIAGEN.id))) %>%
+  mutate(sequence = paste(cdr3aa, cdr3nt, `V-region`, `J-region`, sep = "_")) %>%
+  select(QIAGEN.id, total.UMIs, sequence) %>%
+  reshape2::dcast(formula = sequence ~ QIAGEN.id, value.var = "total.UMIs") -> mat.TRBC
+mat.TRBC[is.na(mat.TRBC)] <- 0
+rownames(mat.TRBC) <- mat.TRBC$sequence
+mat.TRBC <- mat.TRBC[, 2:ncol(mat.TRBC)]
+dist.TRBC <- vegan::vegdist(t(mat.TRBC), method = "morisita")
+dist.TRBC <- 1 - as.matrix(dist.TRBC)
+diag(dist.TRBC) <- 0
+matrix.melted <- reshape2::melt(dist.TRBC)
+
+TCR.pData %>% filter(time.point == "M6") -> pData.TRBC
+
+matrix.melted %>%
+  mutate(patient.id = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = pData.TRBC$patient.id),
+         Var1 = plyr::mapvalues(Var1, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - ")),
+         Var2 = plyr::mapvalues(Var2, from = pData.TRBC$QIAGEN.id, to = paste(pData.TRBC$patient.id, pData.TRBC$fraction.desc, sep = " - "))) %>%
+  arrange(patient.id) %>%
+  mutate(Var1 = factor(Var1, levels = unique(Var1)),
+         Var2 = factor(Var2, levels = unique(Var1))) %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+    geom_tile() + 
+    scale_fill_viridis_c("Morisita Index", limits = c(0, 1)) +
+    theme(axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 10), 
+          axis.text.y = element_text(size = 10),
+          legend.title = element_text(size = 10)) -> plotB
+
+cowplot::plot_grid(plotA, plotB, ncol = 2, labels = c("TRAC", "TRBC"))
+```
+```{r vennDiagram_M6, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+###--- venn diagram - TRAC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRAC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotA <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+###--- venn diagram - TRBC
+# PD-1+TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1+TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> w
+# PD-1+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> x  
+# TIGIT+
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "TIGIT+") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> y 
+# PD-1-TIGIT-
+sample.ids <- TCR.pData %>% filter(time.point == "M6", fraction.desc == "PD-1-TIGIT-") %>% pull(QIAGEN.id)
+TCR.exprs %>% 
+  filter(QIAGEN.id %in% sample.ids, chain == "TRBC") %>% 
+  pull(cdr3nt) %>%
+  unique() -> z
+
+plotB <- draw.quad.venn(area1 = length(w), 
+                       area2 = length(x), 
+                       area3 = length(y), 
+                       area4 = length(z), 
+                       n12 = length(intersect(w, x)), 
+                       n13 = length(intersect(w, y)),
+                       n14 = length(intersect(w, z)),
+                       n23 = length(intersect(x, y)),
+                       n24 = length(intersect(x, z)), 
+                       n34 = length(intersect(y, z)), 
+                       n123 = length(Reduce(f = intersect, x = list(w, x, y))), 
+                       n124 = length(Reduce(f = intersect, x = list(w, x, z))), 
+                       n134 = length(Reduce(f = intersect, x = list(w, y, z))), 
+                       n234 = length(Reduce(f = intersect, x = list(x, y, z))), 
+                       n1234 = length(Reduce(f = intersect, x = list(w, x, y, z))),
+                       category = names(fraction.colors), 
+                       lty = "blank", 
+                       fill = fraction.colors, 
+                       cex = .8, cat.cex = .6, cat.fontfamily = rep("serif", 4), ind = FALSE)
+
+
+cowplot::plot_grid(gTree(children = plotA), gTree(children = plotB), labels = c("TRAC", "TRBC"))
+```
+
