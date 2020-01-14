@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>- TCR-seq - EDA -</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="site_libs/pagedtable-1.1/js/pagedtable.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #ffffff;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Sylvain_et_al_2020</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+<div class="fluid-row" id="header">
+
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">- TCR-seq - EDA -</h1>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2020-01-14
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>Simon_et_al_2020/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.0). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git repository, you know the exact version of the code that produced these results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20200113code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20200113)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20200113code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20200113)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be confident that you successfully produced the results during this run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020tree49f6c617a1c7a62d52f11591cd1b9ae818bbf1ebtargetblank49f6c61a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/tree/49f6c617a1c7a62d52f11591cd1b9ae818bbf1eb" target="_blank">49f6c61</a> </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020tree49f6c617a1c7a62d52f11591cd1b9ae818bbf1ebtargetblank49f6c61a" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility. The version displayed above was the version of the Git repository at the time these results were generated. <br><br> Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.Rhistory
+    Ignored:    code/.Rhistory
+    Ignored:    data/.DS_Store
+    Ignored:    output/.DS_Store
+    Ignored:    output/.Rhistory
+
+Untracked files:
+    Untracked:  analysis/2019-02-22_RNA-seq_DE_1.Rmd
+    Untracked:  analysis/2019-02-22_RNA-seq_DE_2.Rmd
+    Untracked:  analysis/2019-02-22_RNA-seq_DE_3.Rmd
+    Untracked:  data/RNA/
+    Untracked:  data/TCR/
+    Untracked:  data/clinical-data/
+    Untracked:  data/gene-sets/
+    Untracked:  misc/
+    Untracked:  output/2019-02-22_RNA-seq_DE_1.RData
+    Untracked:  output/2019-02-27_TCR-seq_QC.RData
+    Untracked:  output/2019-02-28_TCR-seq_EDA.RData
+    Untracked:  output/2020-01-12_TCR-seq_EDA_2.RData
+    Untracked:  output/RNA_count.rds
+    Untracked:  output/RNA_raw_count.rds
+    Untracked:  output/TCR_count.rds
+    Untracked:  output/TCR_pData.rds
+    Untracked:  output/output_2019-02-22/
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+
+<p>
+These are the previous versions of the R Markdown and HTML files. If you’ve configured a remote Git repository (see <code>?wflow_git_remote</code>), click on the hyperlinks in the table below to view them.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/49f6c617a1c7a62d52f11591cd1b9ae818bbf1eb/analysis/2020-01-12_TCR-seq_EDA_2.Rmd" target="_blank">49f6c61</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+<td>
+Edits .Rmd (TCR-seq_EDA_2)
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/99d00e500903c208a492464c24c0369f424756b2/analysis/2020-01-12_TCR-seq_EDA_2.Rmd" target="_blank">99d00e5</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+<td>
+Edits .Rmd (TCR-seq_EDA_2)
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+<p><em>File creation: January, 12th 2020</em><br />
+<em>Update: January, 14th 2020</em></p>
+<div id="description-importing-data" class="section level1">
+<h1><span class="header-section-number">1</span> Description &amp; importing data</h1>
+<hr />
+<p>RNA was extracted from <strong>12 patients</strong>. Alignment and quantification of TCR sequences have been performed by QIAGEN</p>
+<ul>
+<li><p>12 patients: <strong>P5</strong>, <strong>P6</strong>, <strong>P7</strong>, <strong>P8</strong>, <strong>P14</strong>, <strong>P15</strong>, <strong>P16</strong>, <strong>P18</strong>, <strong>P19</strong>, <strong>P21</strong>, <strong>P22</strong> and <strong>P23</strong>;</p></li>
+<li><p>Four time points: <strong>T0</strong>, <strong>M1</strong>, <strong>M2</strong> &amp; <strong>M6</strong>;</p></li>
+<li><p>One treatment: <strong>anti-PD1</strong>;</p></li>
+<li><p>Four fractions: <strong>PD-1+TIGIT+</strong>, <strong>PD-1+</strong>, <strong>TIGIT+</strong> and <strong>PD-1-TIGIT-</strong>;</p></li>
+<li><p>Two outcomes: <strong>NR</strong> and <strong>R</strong>;</p></li>
+<li><p>Three batches.</p></li>
+</ul>
+<p>QC have already been performed - please look at the TCR-QC section. <strong>Fourteen samples</strong> have been removed.</p>
+<pre class="r"><code>###--- Importation
+#- TCR.pData
+here(&quot;output&quot;, &quot;TCR_pData.rds&quot;) %&gt;%
+  readRDS() -&gt; TCR.pData
+# pData (patient/fraction w/ at least T0 &amp; M1)
+TCR.pData %&gt;% select(patient.id, time.point, fraction, outcome) %&gt;% View(&quot;pData&quot;)
+TCR.pData &lt;- TCR.pData[c(1:39, 41:43, 45:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData %&gt;%
+  arrange(patient.id) %&gt;%
+  select(patient.id, time.point, fraction, outcome) %&gt;% 
+  View(&quot;pData&quot;)
+
+#- TCR.exprs
+here(&quot;output&quot;, &quot;TCR_count.rds&quot;) %&gt;%
+  readRDS() %&gt;%
+  filter(QIAGEN.id %in% TCR.pData$QIAGEN.id) -&gt; TCR.exprs</code></pre>
+</div>
+<div id="summary-statistics" class="section level1">
+<h1><span class="header-section-number">2</span> Summary statistics</h1>
+<hr />
+<p>The clonality score is derived from the Shannon entropy, which is calculated from the frequencies of all productive sequences divided by the logarithm of the total number of unique productive sequences. This normalized entropy value is then inverted (1 - normalized entropy) to produce the clonality metric.<br />
+The Gini coefficient is an alternative metric used to calculate repertoire diversity.<br />
+Both Gini coefficient and clonality are reported on a scale from 0 to 1 where 0 indicates all sequences have the same frequency and 1 indicates the repertoire is dominated by a single sequence.</p>
+<pre class="r"><code>###--- Extracting productive sequences - aggregate samples having the same cdr3aa, cdr3nt and V/J-regions
+TCR.exprs %&gt;%
+  group_by(QIAGEN.id, chain, cdr3nt, cdr3aa, `V-region`, `J-region`) %&gt;%
+  summarise(frequency = sum(freq.after.filtering), 
+            `UMIs with &gt;= 1 reads` = sum(`UMIs with &gt;= 1 reads`),
+            `UMIs with &gt;= 2 reads` = sum(`UMIs with &gt;= 2 reads`),
+            `UMIs with &gt;= 3 reads` = sum(`UMIs with &gt;= 3 reads`),
+            `UMIs with &gt;= 4 reads` = sum(`UMIs with &gt;= 4 reads`),
+            `UMIs with &gt;= 5 reads` = sum(`UMIs with &gt;= 5 reads`),
+            `UMIs with &gt;= 6 reads` = sum(`UMIs with &gt;= 6 reads`),
+            `UMIs with &gt;= 7 reads` = sum(`UMIs with &gt;= 7 reads`),
+            total.reads = sum(`# reads`),
+            total.UMIs = sum(total.UMIs)) %&gt;%
+  arrange(QIAGEN.id, chain, desc(`UMIs with &gt;= 1 reads`)) -&gt; productive.aa
+
+###--- Summary statistics
+productive.aa %&gt;%
+  filter(chain == &quot;TRAC&quot; | chain == &quot;TRBC&quot;) %&gt;% 
+  group_by(QIAGEN.id, chain) %&gt;%
+  summarise(total.reads = sum(total.reads),
+            total.UMIs = sum(total.UMIs),
+            unique.productive = n(),
+            entropy = -sum(frequency * log2(frequency), na.rm = TRUE),
+            gini.coef = ineq::Gini(frequency)) %&gt;%
+  mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) -&gt; dt
+dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot;, &quot;sample.id&quot;, &quot;treatment&quot;, &quot;batch&quot;, &quot;patient.id&quot;, &quot;time.point&quot;, &quot;fraction.desc&quot;, &quot;outcome&quot;)], by = &quot;QIAGEN.id&quot;)</code></pre>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-5-1.png" width="960" style="display: block; margin: auto;" /></p>
+</div>
+<div id="clustering" class="section level1">
+<h1><span class="header-section-number">3</span> Clustering</h1>
+<hr />
+<p>Within each fraction, let&quot;s look at sequences (both TRAC and TRBC). We declare as emerging, expanding, emerging-contracting, expanding-contracting, contracting-expanding, contracting sequences (regarding to M1) that are declared as significant (Fisher exact test to calculate differential abundance of each TRBC (or TRAC) between two time points –<code>total.UMIs</code> value is used) in the following contrasts T0 vs M1. Other sequences are declared as non-expanding/contracting.</p>
+<div id="pd-1tigit" class="section level2">
+<h2><span class="header-section-number">3.1</span> PD-1+TIGIT+</h2>
+<div id="patient---p5" class="section level3">
+<h3><span class="header-section-number">3.1.1</span> Patient - P5</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p6" class="section level3">
+<h3><span class="header-section-number">3.1.2</span> Patient - P6</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p7" class="section level3">
+<h3><span class="header-section-number">3.1.3</span> Patient - P7</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p8" class="section level3">
+<h3><span class="header-section-number">3.1.4</span> Patient - P8</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p14" class="section level3">
+<h3><span class="header-section-number">3.1.5</span> Patient - P14</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p15" class="section level3">
+<h3><span class="header-section-number">3.1.6</span> Patient - P15</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p16" class="section level3">
+<h3><span class="header-section-number">3.1.7</span> Patient - P16</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p18" class="section level3">
+<h3><span class="header-section-number">3.1.8</span> Patient - P18</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p19" class="section level3">
+<h3><span class="header-section-number">3.1.9</span> Patient - P19</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p21" class="section level3">
+<h3><span class="header-section-number">3.1.10</span> Patient - P21</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p22" class="section level3">
+<h3><span class="header-section-number">3.1.11</span> Patient - P22</h3>
+<p>No PD-1+TIGIT+ sample (T0 &amp; M1).</p>
+</div>
+<div id="patient---p23" class="section level3">
+<h3><span class="header-section-number">3.1.12</span> Patient - P23</h3>
+<p>No PD-1+TIGIT+ sample (T0 &amp; M1).</p>
+</div>
+</div>
+<div id="pd-1" class="section level2">
+<h2><span class="header-section-number">3.2</span> PD-1+</h2>
+<div id="patient---p5-1" class="section level3">
+<h3><span class="header-section-number">3.2.1</span> Patient - P5</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p6-1" class="section level3">
+<h3><span class="header-section-number">3.2.2</span> Patient - P6</h3>
+<p>No PD-1+ sample (T0 &amp; M1).</p>
+</div>
+<div id="patient---p7-1" class="section level3">
+<h3><span class="header-section-number">3.2.3</span> Patient - P7</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p8-1" class="section level3">
+<h3><span class="header-section-number">3.2.4</span> Patient - P8</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p14-1" class="section level3">
+<h3><span class="header-section-number">3.2.5</span> Patient - P14</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p15-1" class="section level3">
+<h3><span class="header-section-number">3.2.6</span> Patient - P15</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p16-1" class="section level3">
+<h3><span class="header-section-number">3.2.7</span> Patient - P16</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p18-1" class="section level3">
+<h3><span class="header-section-number">3.2.8</span> Patient - P18</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p19-1" class="section level3">
+<h3><span class="header-section-number">3.2.9</span> Patient - P19</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p21-1" class="section level3">
+<h3><span class="header-section-number">3.2.10</span> Patient - P21</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p22-1" class="section level3">
+<h3><span class="header-section-number">3.2.11</span> Patient - P22</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p23-1" class="section level3">
+<h3><span class="header-section-number">3.2.12</span> Patient - P23</h3>
+<p>No PD-1+ sample (T0 &amp; M1).</p>
+</div>
+</div>
+<div id="tigit" class="section level2">
+<h2><span class="header-section-number">3.3</span> TIGIT+</h2>
+<div id="patient---p5-2" class="section level3">
+<h3><span class="header-section-number">3.3.1</span> Patient - P5</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p6-2" class="section level3">
+<h3><span class="header-section-number">3.3.2</span> Patient - P6</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p7-2" class="section level3">
+<h3><span class="header-section-number">3.3.3</span> Patient - P7</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p8-2" class="section level3">
+<h3><span class="header-section-number">3.3.4</span> Patient - P8</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p14-2" class="section level3">
+<h3><span class="header-section-number">3.3.5</span> Patient - P14</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p15-2" class="section level3">
+<h3><span class="header-section-number">3.3.6</span> Patient - P15</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p16-2" class="section level3">
+<h3><span class="header-section-number">3.3.7</span> Patient - P16</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p18-2" class="section level3">
+<h3><span class="header-section-number">3.3.8</span> Patient - P18</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p19-2" class="section level3">
+<h3><span class="header-section-number">3.3.9</span> Patient - P19</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p21-2" class="section level3">
+<h3><span class="header-section-number">3.3.10</span> Patient - P21</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p22-2" class="section level3">
+<h3><span class="header-section-number">3.3.11</span> Patient - P22</h3>
+<p>No TIGIT+ sample (T0 &amp; M1).</p>
+</div>
+<div id="patient---p23-2" class="section level3">
+<h3><span class="header-section-number">3.3.12</span> Patient - P23</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P23_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="pd-1-tigit-" class="section level2">
+<h2><span class="header-section-number">3.4</span> PD-1-TIGIT-</h2>
+<div id="patient---p5-3" class="section level3">
+<h3><span class="header-section-number">3.4.1</span> Patient - P5</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p6-3" class="section level3">
+<h3><span class="header-section-number">3.4.2</span> Patient - P6</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p7-3" class="section level3">
+<h3><span class="header-section-number">3.4.3</span> Patient - P7</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p8-3" class="section level3">
+<h3><span class="header-section-number">3.4.4</span> Patient - P8</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p14-3" class="section level3">
+<h3><span class="header-section-number">3.4.5</span> Patient - P14</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p15-3" class="section level3">
+<h3><span class="header-section-number">3.4.6</span> Patient - P15</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p16-3" class="section level3">
+<h3><span class="header-section-number">3.4.7</span> Patient - P16</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p18-3" class="section level3">
+<h3><span class="header-section-number">3.4.8</span> Patient - P18</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p19-3" class="section level3">
+<h3><span class="header-section-number">3.4.9</span> Patient - P19</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p21-3" class="section level3">
+<h3><span class="header-section-number">3.4.10</span> Patient - P21</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p22-3" class="section level3">
+<h3><span class="header-section-number">3.4.11</span> Patient - P22</h3>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+<div id="patient---p23-3" class="section level3">
+<h3><span class="header-section-number">3.4.12</span> Patient - P23</h3>
+<p>No PD-1-TIGIT- sample (T0 &amp; M1).</p>
+</div>
+</div>
+<div id="summary" class="section level2">
+<h2><span class="header-section-number">3.5</span> Summary</h2>
+<p><strong>TRAC</strong></p>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-24-1.png" width="384" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-26-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p><em>Table - # of patients per fraction</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"7","3":"4"},{"1":"TIGIT+","2":"8","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><em>Table - NR - # of patients per cluster</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["emerging"],"name":[2],"type":["int"],"align":["right"]},{"label":["expanding"],"name":[3],"type":["int"],"align":["right"]},{"label":["contracting"],"name":[4],"type":["int"],"align":["right"]},{"label":["non-expanding/contracting"],"name":[5],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"7","4":"7","5":"7"},{"1":"PD-1+","2":"6","3":"3","4":"6","5":"6"},{"1":"PD-1+TIGIT+","2":"6","3":"5","4":"6","5":"6"},{"1":"TIGIT+","2":"7","3":"6","4":"7","5":"7"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><em>Table - R - # of patients per cluster</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["emerging"],"name":[2],"type":["int"],"align":["right"]},{"label":["expanding"],"name":[3],"type":["int"],"align":["right"]},{"label":["contracting"],"name":[4],"type":["int"],"align":["right"]},{"label":["non-expanding/contracting"],"name":[5],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"4","3":"4","4":"4","5":"4"},{"1":"PD-1+","2":"4","3":"4","4":"4","5":"4"},{"1":"PD-1+TIGIT+","2":"4","3":"4","4":"4","5":"4"},{"1":"TIGIT+","2":"4","3":"4","4":"4","5":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><strong>TRBC</strong></p>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-31-1.png" width="384" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-33-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p><em>Table - # of patients per fraction</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"7","3":"4"},{"1":"TIGIT+","2":"8","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><em>Table - NR - # of patients per cluster</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["emerging"],"name":[2],"type":["int"],"align":["right"]},{"label":["expanding"],"name":[3],"type":["int"],"align":["right"]},{"label":["contracting"],"name":[4],"type":["int"],"align":["right"]},{"label":["non-expanding/contracting"],"name":[5],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"6","3":"6","4":"6","5":"6"},{"1":"PD-1+","2":"6","3":"6","4":"6","5":"6"},{"1":"PD-1+TIGIT+","2":"5","3":"5","4":"5","5":"5"},{"1":"TIGIT+","2":"6","3":"5","4":"6","5":"6"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><em>Table - R - # of patients per cluster</em></p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["emerging"],"name":[2],"type":["int"],"align":["right"]},{"label":["expanding"],"name":[3],"type":["int"],"align":["right"]},{"label":["contracting"],"name":[4],"type":["int"],"align":["right"]},{"label":["non-expanding/contracting"],"name":[5],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"4","3":"4","4":"4","5":"4"},{"1":"PD-1+","2":"4","3":"4","4":"4","5":"4"},{"1":"PD-1+TIGIT+","2":"4","3":"4","4":"4","5":"4"},{"1":"TIGIT+","2":"4","3":"4","4":"4","5":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 3.6.2 (2019-12-12)
+Platform: x86_64-apple-darwin15.6.0 (64-bit)
+Running under: macOS Mojave 10.14.6
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/3.6/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/3.6/Resources/lib/libRlapack.dylib
+
+Random number generation:
+ RNG:     Mersenne-Twister 
+ Normal:  Inversion 
+ Sample:  Rounding 
+ 
+locale:
+[1] fr_FR.UTF-8/fr_FR.UTF-8/fr_FR.UTF-8/C/fr_FR.UTF-8/fr_FR.UTF-8
+
+attached base packages:
+[1] parallel  grid      stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] broom_0.5.3          doMC_1.3.6           iterators_1.0.12    
+ [4] foreach_1.4.7        ComplexHeatmap_2.2.0 gridExtra_2.3       
+ [7] VennDiagram_1.6.20   futile.logger_1.4.3  here_0.1            
+[10] data.table_1.12.8    janitor_1.2.0        forcats_0.4.0       
+[13] stringr_1.4.0        dplyr_0.8.3          purrr_0.3.3         
+[16] readr_1.3.1          tidyr_1.0.0          tibble_2.1.3        
+[19] ggplot2_3.2.1        tidyverse_1.3.0     
+
+loaded via a namespace (and not attached):
+ [1] nlme_3.1-143         fs_1.3.1             lubridate_1.7.4     
+ [4] RColorBrewer_1.1-2   httr_1.4.1           rprojroot_1.3-2     
+ [7] tools_3.6.2          backports_1.1.5      R6_2.4.1            
+[10] DBI_1.1.0            lazyeval_0.2.2       colorspace_1.4-1    
+[13] GetoptLong_0.1.8     withr_2.1.2          tidyselect_0.2.5    
+[16] compiler_3.6.2       git2r_0.26.1         cli_2.0.1           
+[19] rvest_0.3.5          formatR_1.7          xml2_1.2.2          
+[22] labeling_0.3         scales_1.1.0         digest_0.6.23       
+[25] rmarkdown_2.0        pkgconfig_2.0.3      htmltools_0.4.0     
+[28] dbplyr_1.4.2         rlang_0.4.2          GlobalOptions_0.1.1 
+[31] readxl_1.3.1         rstudioapi_0.10      farver_2.0.2        
+[34] shape_1.4.4          generics_0.0.2       jsonlite_1.6        
+[37] magrittr_1.5         Rcpp_1.0.3           munsell_0.5.0       
+[40] fansi_0.4.1          lifecycle_0.1.0      stringi_1.4.5       
+[43] whisker_0.4          yaml_2.2.0           plyr_1.8.5          
+[46] promises_1.1.0       crayon_1.3.4         lattice_0.20-38     
+[49] haven_2.2.0          cowplot_1.0.0        circlize_0.4.8      
+[52] hms_0.5.3            zeallot_0.1.0        knitr_1.26          
+[55] pillar_1.4.3         rjson_0.2.20         reshape2_1.4.3      
+[58] codetools_0.2-16     futile.options_1.0.1 reprex_0.3.0        
+[61] glue_1.3.1           evaluate_0.14        lambda.r_1.2.4      
+[64] modelr_0.1.5         png_0.1-7            vctrs_0.2.1         
+[67] httpuv_1.5.2         cellranger_1.1.0     gtable_0.3.0        
+[70] clue_0.3-57          assertthat_0.2.1     xfun_0.12           
+[73] later_1.0.0          viridisLite_0.3.0    ineq_0.2-13         
+[76] workflowr_1.6.0      cluster_2.1.0       </code></pre>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
