@@ -1,0 +1,285 @@
+---
+title: "- TCR-seq - QC -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 27th 2019*  
+*Update: January, 14th 2020*   
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(here)
+```
+
+# Description & importing data
+______________________________
+
+RNA was extracted from **12 patients**. Alignment and quantification of TCR sequences have been performed by QIAGEN  
+
+* 12 patients: **P5**, **P6**, **P7**, **P8**, **P14**, **P15**, **P16**, **P18**, **P19**, **P21**, **P22** and **P23**;  
+
+* Four time points: **T0**, **M1**, **M2** & **M6**;  
+
+* One treatment: **anti-PD1**;  
+
+* Four fractions: **PD-1+TIGIT+**, **PD-1+**, **TIGIT+** and **PD-1-TIGIT-**;  
+
+* Two outcomes: **NR** and **R**;  
+
+* Three batches.  
+
+According to QIAGEN, some samples have small library sizes (in which mainly reads were > 55bp); and others have libraries of correct size but mostly with reads < 55 bp.  
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- RNA-seq
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+countData %>% pData() %>% View("countData pData")
+
+###--- TCR-seq - preprocessing
+##- sample.id
+here("data", "TCR", "TCRseq_samples_ID.xlsx") %>%
+  readxl::read_xlsx(sheet = 2) %>%
+  clean_names() -> TCRseq_sample.id
+
+##- TCR-seq - batch 1 (expression & pData)
+#- pData
+TCRseq_sample.id %>%
+  select(sample_number_1, well_location_2, sample_id_3, x4) %>%
+  rename(sample.number = sample_number_1, 
+         well.location = well_location_2, 
+         sample.id = sample_id_3,
+         QIAGEN.id = x4) %>% 
+  mutate(treatment = c(rep("anti-PD1", 84), rep("anti-PD1/CTLA4", 12)),
+         batch = "batch 1") -> TCRseq_pData_batch1
+#- QC
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.summary-1.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% na.omit() %>% t() -> TCRseq_QC_batch1
+colnames(TCRseq_QC_batch1) <- c(paste0("# ", TCRseq_QC_batch1[1, 1:9]), paste0("% ", TCRseq_QC_batch1[1, 10:14]), TCRseq_QC_batch1[1, 15:24])
+TCRseq_QC_batch1 <- TCRseq_QC_batch1[2:nrow(TCRseq_QC_batch1), ]
+TCRseq_QC_batch1 <- data.table(QIAGEN.id = rownames(TCRseq_QC_batch1), 
+                               apply(TCRseq_QC_batch1, 2, as.numeric))
+#- pData final
+merge(TCRseq_pData_batch1, TCRseq_QC_batch1, by = "QIAGEN.id", drop = T) %>%
+  arrange(sample.number) -> TCRseq_sample.id_batch1 
+# Expression
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.clonotypes-1.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>%
+  rename(QIAGEN.id = `read set`, 
+         cdr3nt = `CDR3 nucleotide seq`, 
+         cdr3aa = `CDR3 amino acid seq`,
+         `# reads` = reads) -> TCRseq_batch1 # 500,095 rows
+TCRseq_batch1 %>%
+  filter(QIAGEN.id %in% TCRseq_sample.id_batch1$QIAGEN.id) -> TCRseq_batch1 # 103,734 rows
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+##- TCR-seq - batch 2 (expression & pData)
+#- pData
+TCRseq_sample.id %>%
+  select(sample_number_7, well_location_8, sample_id_9, x10) %>%
+  rename(sample.number = sample_number_7, 
+         well.location = well_location_8, 
+         sample.id = sample_id_9,
+         QIAGEN.id = x10) %>% 
+  mutate(treatment = c(rep("anti-PD1", 64), rep("anti-PD1/CTLA4", 32)),
+         batch = "batch 2") %>%
+  filter(!is.na(QIAGEN.id)) -> TCRseq_pData_batch2
+#- QC
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.summary-2.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% na.omit() %>% t() -> TCRseq_QC_batch2
+colnames(TCRseq_QC_batch2) <- c(paste0("# ", TCRseq_QC_batch2[1, 1:9]), paste0("% ", TCRseq_QC_batch2[1, 10:14]), TCRseq_QC_batch2[1, 15:24])
+TCRseq_QC_batch2 <- TCRseq_QC_batch2[2:nrow(TCRseq_QC_batch2), ]
+TCRseq_QC_batch2 <- data.table(QIAGEN.id = rownames(TCRseq_QC_batch2), 
+                               apply(TCRseq_QC_batch2, 2, as.numeric))
+#- pData final
+merge(TCRseq_pData_batch2, TCRseq_QC_batch2, by = "QIAGEN.id", drop = T) %>%
+  arrange(sample.number) -> TCRseq_sample.id_batch2 
+# Expression
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.clonotypes-2.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% 
+  rename(QIAGEN.id = `read set`, 
+         cdr3nt = `CDR3 nucleotide seq`, 
+         cdr3aa = `CDR3 amino acid seq`,
+         `# reads` = reads) %>% 
+  select(1:16) -> TCRseq_batch2 # 125,564 rows
+TCRseq_batch2 %>%
+  filter(QIAGEN.id %in% TCRseq_sample.id_batch2$QIAGEN.id) -> TCRseq_batch2 # 121,949 rows
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+##- TCR-seq - batch 3 (expression & pData)
+#- pData
+TCRseq_sample.id %>%
+  select(sample_number_12, well_location_13, sample_id_14, x15) %>%
+  na.omit() %>% 
+  rename(sample.number = sample_number_12, 
+         well.location = well_location_13, 
+         sample.id = sample_id_14,
+         QIAGEN.id = x15) %>% 
+  mutate(treatment = c(rep("anti-PD1", 32), rep("anti-PD1/CTLA4", 12), rep("anti-PD1", 7)),
+         batch = "batch 3") %>%
+  filter(!is.na(QIAGEN.id)) -> TCRseq_pData_batch3
+#- QC
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.summary-3.xlsx") %>%
+  readxl::read_xlsx(sheet = 4) %>% na.omit() %>% t() -> TCRseq_QC_batch3
+TCRseq_QC_batch3 <- TCRseq_QC_batch3[, 4:ncol(TCRseq_QC_batch3)]
+colnames(TCRseq_QC_batch3) <- c(paste0("# ", TCRseq_QC_batch3[1, 1:9]), paste0("% ", TCRseq_QC_batch3[1, 10:14]), TCRseq_QC_batch3[1, 15:24])
+TCRseq_QC_batch3 <- TCRseq_QC_batch3[2:nrow(TCRseq_QC_batch3), ]
+TCRseq_QC_batch3 <- data.table(QIAGEN.id = rownames(TCRseq_QC_batch3), 
+                               apply(TCRseq_QC_batch3, 2, as.numeric))
+#- pData final
+merge(TCRseq_pData_batch3, TCRseq_QC_batch3, by = "QIAGEN.id", drop = T) %>%
+  arrange(sample.number) -> TCRseq_sample.id_batch3
+# Expression
+here("data", "TCR", "QIAseqRNA-immune-repertoire-TCR.clonotypes-3.xlsx") %>%
+  readxl::read_xlsx(sheet = 1) %>% 
+  rename(QIAGEN.id = `read set`, 
+         cdr3nt = `CDR3 nucleotide seq`, 
+         cdr3aa = `CDR3 amino acid seq`,
+         `# reads` = reads) %>% 
+  select(1:16) -> TCRseq_batch3 # 37,428 rows
+TCRseq_batch3 %>%
+  filter(QIAGEN.id %in% TCRseq_sample.id_batch3$QIAGEN.id) -> TCRseq_batch3 # 37,428 rows
+TCRseq_batch3$frequency <- as.numeric(TCRseq_batch3$frequency)
+```
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- TCR-seq - merge
+#- pData
+bind_rows(TCRseq_sample.id_batch1, TCRseq_sample.id_batch2, TCRseq_sample.id_batch3) %>% 
+  rowwise() %>%
+  mutate(patient.id = str_split(sample.id, pattern = "-")[[1]][1]) %>%
+  mutate(patient.id = ifelse(batch == "batch 1" & treatment == "anti-PD1", 
+                             paste0("P", patient.id), 
+                             ifelse(batch == "batch 2" & treatment == "anti-PD1/CTLA4", str_remove(patient.id, pattern = "P"),
+                                    ifelse(batch == "batch 3" & treatment == "anti-PD1/CTLA4", str_remove(patient.id, pattern = "P"), patient.id))),
+         time.point = str_split(sample.id, pattern = "-")[[1]][3],
+         fraction = str_split(sample.id, pattern = "-")[[1]][4]) %>% 
+  mutate(fraction.desc = str_replace_all(fraction, c("TIGIT" = "TIGIT+"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("PD1" = "PD-1+"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("DNEG" = "PD-1-TIGIT-"))) %>%
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("DPOS" = "PD-1+TIGIT+"))) -> TCR.pData
+TCR.pData %>% View("TCR.pData")
+#- TCR sequencing
+bind_rows(TCRseq_batch1, TCRseq_batch2, TCRseq_batch3) -> TCR.exprs
+TCR.exprs %>% View("TCR.exprs")
+
+#- Remove anti-PD1 & anti-CTLA4 samples 
+TCR.pData %>%
+  filter(treatment == "anti-PD1" & fraction.desc != "CXCR5") -> TCR.pData
+TCR.pData$fraction.desc <- factor(x = TCR.pData$fraction.desc, levels = c("PD-1-TIGIT-", "PD-1+", "PD-1+TIGIT+", "TIGIT+"))
+TCR.pData$patient.id <- factor(x = TCR.pData$patient.id, levels = c("P5", "P6", "P7", "P8", "P14", "P15", "P16", "P18", "P19", "P21", "P22", "P23"))
+TCR.pData$time.point <- factor(x = TCR.pData$time.point, levels = c("T0", "M1", "M2", "M6"))
+TCR.exprs %>%
+  filter(QIAGEN.id %in% TCR.pData$QIAGEN.id) -> TCR.exprs
+
+#- Add outcome
+TCR.pData %>%
+  mutate(outcome = ifelse(patient.id %in% c("P7", "P8", "P14", "P15", "P18", "P19", "P21"), "R", "NR")) -> TCR.pData
+
+#- Output
+gdata::keep(TCR.exprs, TCR.pData, sure = TRUE)
+save.image(here("output", "2019-02-27_TCR-seq_QC.RData"))
+```
+
+As in Simon et al. (2018), to leverage the power of UMI tagging to reduce NGS errors leading to fals clonotype calls, QIAGEN discarded cdr3 calls that did not have at least one UMI supported by three reads.  
+
+
+
+
+# Quality Control
+_________________
+
+```{r barplot_qc_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
+###--- # read pairs total
+load(here("output", "2019-02-27_TCR-seq_QC.RData"))
+
+TCR.pData %>%
+  ggplot(aes(x = sample.id, y = `# read pairs total`, fill = sample.id)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~ batch, ncol = 3, scales = "free_x") +
+    labs(y = "read pairs total") +
+    theme(legend.position = "none", axis.title.x = element_blank(), axis.ticks = element_blank(), axis.text.x = element_blank())
+```
+
+It appears that some samples have a pretty low total of read pairs.  
+
+```{r barplot_qc_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
+###--- % reads usable for clonotype calls
+TCR.pData %>%
+  ggplot(aes(x = sample.id, y = `% reads usable for clonotype calls all`, fill = sample.id)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~ batch, ncol = 3, scales = "free_x") +
+    geom_hline(yintercept = .4, lty = 3, color = "grey80") +
+    labs(y = "% reads usable for clonotype calls") +
+    theme(legend.position = "none", axis.title.x = element_blank(), axis.ticks = element_blank(), axis.text.x = element_blank())
+```
+
+Some samples have less than 40% of their total reads that have been used for clonotype calls.  
+
+```{r barplot_qc_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
+###--- mean read pairs per UMI
+TCR.pData %>%
+  ggplot(aes(x = sample.id, y = `mean read pairs per UMI`, fill = sample.id)) +
+    geom_bar(stat = "identity") +
+    geom_hline(yintercept = 3, lty = 3, color = "grey80") +
+    facet_wrap(~ batch, ncol = 3, scales = "free_x") +
+    labs(y = "mean read pairs per UMI") +
+    theme(legend.position = "none", axis.title.x = element_blank(), axis.ticks = element_blank(), axis.text.x = element_blank())
+```
+
+Few samples have less than 3 as mean read pairs per UMI.  
+
+Samples w/ **less than 250000 total read pairs**, **less than 40% of total reads usable for clonotype calls** and **less than 3 as mean read pairs per UMI** are removed for downstream analyses.  
+In total, **14 samples** are removed (*6-ZC-T0-PD1*, *6-ZC-M1-PD1*, *8-CJ-M2-PD1*, *8-CJ-M6-TIGIT*, *16-PR-M2-TIGIT*, *P19-BM-M2-DPOS*, *P22-GM-M1-DPOS*, *P22-GM-M1-TIGIT*, *P23-MA-T0-DPOS*, *P23-MA-T0-DNEG*, *P23-MA-T0-PD1*, *P23-MA-M2-DPOS*, *P23-MA-M2-DNEG* & *P23-MA-M2-PD1*).  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Filtering
+#- TCR pData
+TCR.pData %>%
+  filter(`# read pairs total` < 250000 | `% reads usable for clonotype calls all` < 0.4 | `mean read pairs per UMI` < 3) %>%
+  pull(QIAGEN.id) -> sample.id.r
+TCR.pData %>%
+  filter(QIAGEN.id %in% sample.id.r) %>% 
+  View("samples.to.remove") # 14 samples
+TCR.pData.2 <- TCR.pData %>%
+  filter(!QIAGEN.id %in% sample.id.r)
+saveRDS(object = TCR.pData.2, here("output", "TCR_pData.rds"))
+#- TCR exprs
+TCR.exprs %>%
+  filter(QIAGEN.id %in% TCR.pData.2$QIAGEN.id) %>%
+  filter(nchar(cdr3aa) >= 7 & nchar(cdr3aa) <= 25) %>%
+  mutate(total.UMIs = `UMIs with >= 1 reads`) %>%
+  group_by(QIAGEN.id, chain) %>%
+  mutate(freq.after.filtering = total.UMIs / sum(total.UMIs)) -> TCR.exprs.2
+saveRDS(object = TCR.exprs.2, here("output", "TCR_count.rds"))
+
+###--- Comparison with RNA-seq
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+countData$sample.id # 120 samples
+TCR.pData.2$sample.id # 158 samples (M6 included)
+intersect(countData$sample.id, TCR.pData.2$sample.id) # 114 samples
+setdiff(countData$sample.id, TCR.pData.2$sample.id) # 7 samples
+setdiff(TCR.pData.2$sample.id, countData$sample.id) # 44 samples
+```
+
+
+
