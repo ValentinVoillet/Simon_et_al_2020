@@ -505,10 +505,10 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treef9608b7555f1e4c24c444519010ad16bf21cf2f0targetblankf9608b7a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/tree/f9608b7555f1e4c24c444519010ad16bf21cf2f0" target="_blank">f9608b7</a> </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treea98e6a596197903182f9b2e4924263bdbb9fdc80targetblanka98e6a5a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/tree/a98e6a596197903182f9b2e4924263bdbb9fdc80" target="_blank">a98e6a5</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treef9608b7555f1e4c24c444519010ad16bf21cf2f0targetblankf9608b7a" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treea98e6a596197903182f9b2e4924263bdbb9fdc80targetblanka98e6a5a" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility. The version displayed above was the version of the Git repository at the time these results were generated. <br><br> Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -528,6 +528,7 @@ Untracked files:
     Untracked:  analysis/2019-02-22_RNA-seq_DE_1.Rmd
     Untracked:  analysis/2019-02-22_RNA-seq_DE_2.Rmd
     Untracked:  analysis/2019-02-22_RNA-seq_DE_3.Rmd
+    Untracked:  analysis/2020-01-12_TCR-seq_EDA_2.Rmd
     Untracked:  data/RNA/
     Untracked:  data/TCR/
     Untracked:  data/clinical-data/
@@ -536,6 +537,7 @@ Untracked files:
     Untracked:  output/2019-02-22_RNA-seq_DE_1.RData
     Untracked:  output/2019-02-27_TCR-seq_QC.RData
     Untracked:  output/2019-02-28_TCR-seq_EDA.RData
+    Untracked:  output/2020-01-12_TCR-seq_EDA_2.RData
     Untracked:  output/RNA_count.rds
     Untracked:  output/RNA_raw_count.rds
     Untracked:  output/TCR_count.rds
@@ -582,6 +584,23 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/ValentinVoillet/Simon_et_al_2020/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/2019-02-28_TCR-seq_EDA.html" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+<td>
+Add .html files
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -678,7 +697,120 @@ productive.aa %&gt;%
             gini.coef = ineq::Gini(frequency)) %&gt;%
   mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) -&gt; dt
 dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot;, &quot;sample.id&quot;, &quot;treatment&quot;, &quot;batch&quot;, &quot;patient.id&quot;, &quot;time.point&quot;, &quot;fraction.desc&quot;)], by = &quot;QIAGEN.id&quot;)</code></pre>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-1.png" width="528" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-2.png" width="528" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-3.png" width="528" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-1.png" width="528" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-summary_statistics-1">
+Past versions of summary_statistics-1.png
+</button>
+</p>
+<div id="fig-summary_statistics-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-2.png" width="528" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-summary_statistics-2">
+Past versions of summary_statistics-2.png
+</button>
+</p>
+<div id="fig-summary_statistics-2" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-2.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-3.png" width="528" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-summary_statistics-3">
+Past versions of summary_statistics-3.png
+</button>
+</p>
+<div id="fig-summary_statistics-3" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/summary_statistics-3.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <div id="trac" class="section level3">
 <h3><span class="header-section-number">2.2.1</span> TRAC</h3>
 <p><strong>Table 1: TRAC clonotypes</strong></p>
@@ -688,11 +820,312 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
   </script>
 </div>
 <p><strong>Figure 1: # of unique TRAC sequences across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-1.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-2.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-3.png" width="288" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_2-1.png" width="480" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-1.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_1-1">
+Past versions of TRAC_1-1.png
+</button>
+</p>
+<div id="fig-TRAC_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_1-2">
+Past versions of TRAC_1-2.png
+</button>
+</p>
+<div id="fig-TRAC_1-2" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-2.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-3.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_1-3">
+Past versions of TRAC_1-3.png
+</button>
+</p>
+<div id="fig-TRAC_1-3" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_1-3.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_2-1.png" width="480" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_2-1">
+Past versions of TRAC_2-1.png
+</button>
+</p>
+<div id="fig-TRAC_2-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_2-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><strong>Figure 2: TRAC clonality across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-1.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-1.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_3-1">
+Past versions of TRAC_3-1.png
+</button>
+</p>
+<div id="fig-TRAC_3-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_3-2">
+Past versions of TRAC_3-2.png
+</button>
+</p>
+<div id="fig-TRAC_3-2" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_3-2.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><strong>Figure 3: TRAC proportion across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_4-1.png" width="960" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-8-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_4-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRAC_4-1">
+Past versions of TRAC_4-1.png
+</button>
+</p>
+<div id="fig-TRAC_4-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRAC_4-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-8-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-8-1">
+Past versions of unnamed-chunk-8-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-8-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-8-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="trbc" class="section level3">
 <h3><span class="header-section-number">2.2.2</span> TRBC</h3>
@@ -703,11 +1136,312 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
   </script>
 </div>
 <p><strong>Figure 1: # of unique TRBC sequences across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-1.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-2.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-3.png" width="288" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_2-1.png" width="480" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-1.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_1-1">
+Past versions of TRBC_1-1.png
+</button>
+</p>
+<div id="fig-TRBC_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_1-2">
+Past versions of TRBC_1-2.png
+</button>
+</p>
+<div id="fig-TRBC_1-2" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-2.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-3.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_1-3">
+Past versions of TRBC_1-3.png
+</button>
+</p>
+<div id="fig-TRBC_1-3" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_1-3.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_2-1.png" width="480" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_2-1">
+Past versions of TRBC_2-1.png
+</button>
+</p>
+<div id="fig-TRBC_2-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_2-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><strong>Figure 2: TRBC clonality across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-1.png" width="288" style="display: block; margin: auto;" /><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-1.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_3-1">
+Past versions of TRBC_3-1.png
+</button>
+</p>
+<div id="fig-TRBC_3-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-2.png" width="288" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_3-2">
+Past versions of TRBC_3-2.png
+</button>
+</p>
+<div id="fig-TRBC_3-2" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_3-2.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><strong>Figure 3: TRBC proportion across fraction, time point and treatment</strong></p>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_4-1.png" width="960" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-10-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_4-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-TRBC_4-1">
+Past versions of TRBC_4-1.png
+</button>
+</p>
+<div id="fig-TRBC_4-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/TRBC_4-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-10-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-10-1">
+Past versions of unnamed-chunk-10-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-10-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/unnamed-chunk-10-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 </div>
 <div id="overlap-across-fractions-within-time-points" class="section level2">
@@ -716,19 +1450,319 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <p>Morisita&quot;s overlap index, named after Masaaki Morisita, is a statistical <strong>measure of dispersion</strong> of individuals in a population. It is used to compare overlap among samples (Morisita 1959). This formula is based on the assumption that increasing the size of the samples will increase the diversity because it will include different habitats (i.e. different faunas).</p>
 <div id="t0" class="section level3">
 <h3><span class="header-section-number">2.3.1</span> T0</h3>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_T0-1.png" width="1920" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_T0-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_T0-1.png" width="1920" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-morisita_T0-1">
+Past versions of morisita_T0-1.png
+</button>
+</p>
+<div id="fig-morisita_T0-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_T0-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_T0-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-vennDiagram_T0-1">
+Past versions of vennDiagram_T0-1.png
+</button>
+</p>
+<div id="fig-vennDiagram_T0-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_T0-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="m1" class="section level3">
 <h3><span class="header-section-number">2.3.2</span> M1</h3>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M1-1.png" width="1920" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M1-1.png" width="1920" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-morisita_M1-1">
+Past versions of morisita_M1-1.png
+</button>
+</p>
+<div id="fig-morisita_M1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M1-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-vennDiagram_M1-1">
+Past versions of vennDiagram_M1-1.png
+</button>
+</p>
+<div id="fig-vennDiagram_M1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M1-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="m2" class="section level3">
 <h3><span class="header-section-number">2.3.3</span> M2</h3>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M2-1.png" width="1632" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M2-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M2-1.png" width="1632" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-morisita_M2-1">
+Past versions of morisita_M2-1.png
+</button>
+</p>
+<div id="fig-morisita_M2-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M2-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M2-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-vennDiagram_M2-1">
+Past versions of vennDiagram_M2-1.png
+</button>
+</p>
+<div id="fig-vennDiagram_M2-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M2-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="m6" class="section level3">
 <h3><span class="header-section-number">2.3.4</span> M6</h3>
-<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M6-1.png" width="1344" style="display: block; margin: auto;" /> <img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M6-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M6-1.png" width="1344" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-morisita_M6-1">
+Past versions of morisita_M6-1.png
+</button>
+</p>
+<div id="fig-morisita_M6-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/morisita_M6-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><img src="figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M6-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-vennDiagram_M6-1">
+Past versions of vennDiagram_M6-1.png
+</button>
+</p>
+<div id="fig-vennDiagram_M6-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/85b86fdfc59bb61f8f68db2c789cf1a21d8db9b3/docs/figure/2019-02-28_TCR-seq_EDA.Rmd/vennDiagram_M6-1.png" target="_blank">85b86fd</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
