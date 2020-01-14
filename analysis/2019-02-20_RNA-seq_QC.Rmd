@@ -137,8 +137,8 @@ bind_rows(RNAseq_sample.id_batch1, RNAseq_sample.id_batch2) %>%
   mutate(fraction.desc = str_replace_all(fraction, c("TIGIT" = "TIGIT+"))) %>%
   mutate(fraction.desc = str_replace_all(fraction.desc, c("PD1" = "PD-1+"))) %>%
   mutate(fraction.desc = str_replace_all(fraction.desc, c("DNEG" = "PD-1-TIGIT-"))) %>%
-  mutate(fraction.desc = str_replace_all(fraction.desc, c("DPOS" = "PD-1+TIGIT+"))) -> pData
-pData$outcome <- c(rep("NR", 12), rep("NR", 8), rep("R", 12), rep("R", 12), rep("R", 12), rep("R", 12), rep("NR", 12), rep(NA, 12), rep(NA, 4), rep("R", 12), rep("R", 12), rep("R", 12), rep("NR", 12), rep("NR", 12), rep(NA, 36))
+  mutate(fraction.desc = str_replace_all(fraction.desc, c("DPOS" = "PD-1+TIGIT+"))) %>% 
+  mutate(outcome = ifelse(patient.id %in% c("P7", "P8", "P14", "P15"), "R", "NR")) -> pData
 rownames(pData) <- pData$sample.id
 pData %>% View("pData")
 

@@ -193,7 +193,7 @@ TCR.exprs %>%
 
 #- Add outcome
 TCR.pData %>%
-  mutate(outcome = ifelse(patient.id %in% c("P7", "P8", "P14", "P15", "P18", "P19", "P21"), "R", "NR")) -> TCR.pData
+  mutate(outcome = ifelse(patient.id %in% c("P7", "P8", "P14", "P15"), "R", "NR")) -> TCR.pData
 
 #- Output
 gdata::keep(TCR.exprs, TCR.pData, sure = TRUE)
