@@ -60,7 +60,7 @@ RNA was extracted from **12 patients**. Alignment and quantification of TCR sequ
 
 QC have already been performed - please look at the TCR-QC section. **Fourteen samples** have been removed.  
 
-```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
 ###--- Importation
 #- TCR.pData
 here("output", "TCR_pData.rds") %>%
