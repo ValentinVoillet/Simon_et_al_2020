@@ -336,6 +336,7 @@ pData(raw.countData) %>%
   pull(sample.id) -> sample.id.r
 
 countData <- raw.countData[, setdiff(colnames(raw.countData), sample.id.r)]
+countData <- countData[which(rownames(countData) != "TCF7" & rownames(countData) != "ITGAE"), ]
 pData(countData) %>% View()
 pData(countData) %>% dim()
 saveRDS(object = countData, file = here("output", "RNA_count.rds"))
