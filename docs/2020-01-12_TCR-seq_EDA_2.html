@@ -414,7 +414,7 @@ div.section {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2020-01-14
+<strong>Last updated:</strong> 2020-01-15
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 0
@@ -505,10 +505,10 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020tree49f6c617a1c7a62d52f11591cd1b9ae818bbf1ebtargetblank49f6c61a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/tree/49f6c617a1c7a62d52f11591cd1b9ae818bbf1eb" target="_blank">49f6c61</a> </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treed9398bca124fd31a1cc2b92c76588e70c4b6169etargetblankd9398bca"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/tree/d9398bca124fd31a1cc2b92c76588e70c4b6169e" target="_blank">d9398bc</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020tree49f6c617a1c7a62d52f11591cd1b9ae818bbf1ebtargetblank49f6c61a" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomValentinVoilletSimonetal2020treed9398bca124fd31a1cc2b92c76588e70c4b6169etargetblankd9398bca" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility. The version displayed above was the version of the Git repository at the time these results were generated. <br><br> Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -585,6 +585,40 @@ Message
 Rmd
 </td>
 <td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/d9398bca124fd31a1cc2b92c76588e70c4b6169e/analysis/2020-01-12_TCR-seq_EDA_2.Rmd" target="_blank">d9398bc</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-15
+</td>
+<td>
+Edits .Rmd (TCR-seq_EDA_2)
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/ValentinVoillet/Simon_et_al_2020/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/2020-01-12_TCR-seq_EDA_2.html" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+<td>
+Add .html files
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
 <a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/49f6c617a1c7a62d52f11591cd1b9ae818bbf1eb/analysis/2020-01-12_TCR-seq_EDA_2.Rmd" target="_blank">49f6c61</a>
 </td>
 <td>
@@ -651,7 +685,8 @@ here(&quot;output&quot;, &quot;TCR_pData.rds&quot;) %&gt;%
   readRDS() -&gt; TCR.pData
 # pData (patient/fraction w/ at least T0 &amp; M1)
 TCR.pData %&gt;% select(patient.id, time.point, fraction, outcome) %&gt;% View(&quot;pData&quot;)
-TCR.pData &lt;- TCR.pData[c(1:39, 41:43, 45:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData &lt;- TCR.pData[c(1:39, 41:43, 45:114, 117:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData %&gt;% filter(time.point != &quot;M2&quot; &amp; time.point != &quot;M6&quot;) -&gt; TCR.pData
 TCR.pData %&gt;%
   arrange(patient.id) %&gt;%
   select(patient.id, time.point, fraction, outcome) %&gt;% 
@@ -695,6 +730,43 @@ productive.aa %&gt;%
   mutate(clonality = 1 - round(entropy / log2(unique.productive), digits = 6)) -&gt; dt
 dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot;, &quot;sample.id&quot;, &quot;treatment&quot;, &quot;batch&quot;, &quot;patient.id&quot;, &quot;time.point&quot;, &quot;fraction.desc&quot;, &quot;outcome&quot;)], by = &quot;QIAGEN.id&quot;)</code></pre>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-5-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-5-1">
+Past versions of unnamed-chunk-5-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-5-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-5-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="clustering" class="section level1">
 <h1><span class="header-section-number">3</span> Clustering</h1>
@@ -705,42 +777,412 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p5" class="section level3">
 <h3><span class="header-section-number">3.1.1</span> Patient - P5</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P5_DPOS_1-1">
+Past versions of P5_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P5_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p6" class="section level3">
 <h3><span class="header-section-number">3.1.2</span> Patient - P6</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P6_DPOS_1-1">
+Past versions of P6_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P6_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p7" class="section level3">
 <h3><span class="header-section-number">3.1.3</span> Patient - P7</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P7_DPOS_1-1">
+Past versions of P7_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P7_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p8" class="section level3">
 <h3><span class="header-section-number">3.1.4</span> Patient - P8</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P8_DPOS_1-1">
+Past versions of P8_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P8_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p14" class="section level3">
 <h3><span class="header-section-number">3.1.5</span> Patient - P14</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P14_DPOS_1-1">
+Past versions of P14_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P14_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p15" class="section level3">
 <h3><span class="header-section-number">3.1.6</span> Patient - P15</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P15_DPOS_1-1">
+Past versions of P15_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P15_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p16" class="section level3">
 <h3><span class="header-section-number">3.1.7</span> Patient - P16</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P16_DPOS_1-1">
+Past versions of P16_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P16_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p18" class="section level3">
 <h3><span class="header-section-number">3.1.8</span> Patient - P18</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P18_DPOS_1-1">
+Past versions of P18_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P18_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p19" class="section level3">
 <h3><span class="header-section-number">3.1.9</span> Patient - P19</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P19_DPOS_1-1">
+Past versions of P19_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P19_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p21" class="section level3">
 <h3><span class="header-section-number">3.1.10</span> Patient - P21</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DPOS_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P21_DPOS_1-1">
+Past versions of P21_DPOS_1-1.png
+</button>
+</p>
+<div id="fig-P21_DPOS_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DPOS_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p22" class="section level3">
 <h3><span class="header-section-number">3.1.11</span> Patient - P22</h3>
@@ -756,6 +1198,43 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p5-1" class="section level3">
 <h3><span class="header-section-number">3.2.1</span> Patient - P5</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P5_PD1_1-1">
+Past versions of P5_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P5_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p6-1" class="section level3">
 <h3><span class="header-section-number">3.2.2</span> Patient - P6</h3>
@@ -764,38 +1243,371 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p7-1" class="section level3">
 <h3><span class="header-section-number">3.2.3</span> Patient - P7</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P7_PD1_1-1">
+Past versions of P7_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P7_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p8-1" class="section level3">
 <h3><span class="header-section-number">3.2.4</span> Patient - P8</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P8_PD1_1-1">
+Past versions of P8_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P8_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p14-1" class="section level3">
 <h3><span class="header-section-number">3.2.5</span> Patient - P14</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P14_PD1_1-1">
+Past versions of P14_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P14_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p15-1" class="section level3">
 <h3><span class="header-section-number">3.2.6</span> Patient - P15</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P15_PD1_1-1">
+Past versions of P15_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P15_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p16-1" class="section level3">
 <h3><span class="header-section-number">3.2.7</span> Patient - P16</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P16_PD1_1-1">
+Past versions of P16_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P16_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p18-1" class="section level3">
 <h3><span class="header-section-number">3.2.8</span> Patient - P18</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P18_PD1_1-1">
+Past versions of P18_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P18_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p19-1" class="section level3">
 <h3><span class="header-section-number">3.2.9</span> Patient - P19</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P19_PD1_1-1">
+Past versions of P19_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P19_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p21-1" class="section level3">
 <h3><span class="header-section-number">3.2.10</span> Patient - P21</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P21_PD1_1-1">
+Past versions of P21_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P21_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p22-1" class="section level3">
 <h3><span class="header-section-number">3.2.11</span> Patient - P22</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_PD1_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P22_PD1_1-1">
+Past versions of P22_PD1_1-1.png
+</button>
+</p>
+<div id="fig-P22_PD1_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_PD1_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p23-1" class="section level3">
 <h3><span class="header-section-number">3.2.12</span> Patient - P23</h3>
@@ -807,42 +1619,412 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p5-2" class="section level3">
 <h3><span class="header-section-number">3.3.1</span> Patient - P5</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P5_TIGIT_1-1">
+Past versions of P5_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P5_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p6-2" class="section level3">
 <h3><span class="header-section-number">3.3.2</span> Patient - P6</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P6_TIGIT_1-1">
+Past versions of P6_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P6_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p7-2" class="section level3">
 <h3><span class="header-section-number">3.3.3</span> Patient - P7</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P7_TIGIT_1-1">
+Past versions of P7_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P7_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p8-2" class="section level3">
 <h3><span class="header-section-number">3.3.4</span> Patient - P8</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P8_TIGIT_1-1">
+Past versions of P8_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P8_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p14-2" class="section level3">
 <h3><span class="header-section-number">3.3.5</span> Patient - P14</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P14_TIGIT_1-1">
+Past versions of P14_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P14_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p15-2" class="section level3">
 <h3><span class="header-section-number">3.3.6</span> Patient - P15</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P15_TIGIT_1-1">
+Past versions of P15_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P15_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p16-2" class="section level3">
 <h3><span class="header-section-number">3.3.7</span> Patient - P16</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P16_TIGIT_1-1">
+Past versions of P16_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P16_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p18-2" class="section level3">
 <h3><span class="header-section-number">3.3.8</span> Patient - P18</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P18_TIGIT_1-1">
+Past versions of P18_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P18_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p19-2" class="section level3">
 <h3><span class="header-section-number">3.3.9</span> Patient - P19</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P19_TIGIT_1-1">
+Past versions of P19_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P19_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p21-2" class="section level3">
 <h3><span class="header-section-number">3.3.10</span> Patient - P21</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P21_TIGIT_1-1">
+Past versions of P21_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P21_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p22-2" class="section level3">
 <h3><span class="header-section-number">3.3.11</span> Patient - P22</h3>
@@ -851,6 +2033,43 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p23-2" class="section level3">
 <h3><span class="header-section-number">3.3.12</span> Patient - P23</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P23_TIGIT_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P23_TIGIT_1-1">
+Past versions of P23_TIGIT_1-1.png
+</button>
+</p>
+<div id="fig-P23_TIGIT_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P23_TIGIT_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 </div>
 <div id="pd-1-tigit-" class="section level2">
@@ -858,46 +2077,453 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <div id="patient---p5-3" class="section level3">
 <h3><span class="header-section-number">3.4.1</span> Patient - P5</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P5_DNEG_1-1">
+Past versions of P5_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P5_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P5_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p6-3" class="section level3">
 <h3><span class="header-section-number">3.4.2</span> Patient - P6</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P6_DNEG_1-1">
+Past versions of P6_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P6_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P6_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p7-3" class="section level3">
 <h3><span class="header-section-number">3.4.3</span> Patient - P7</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P7_DNEG_1-1">
+Past versions of P7_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P7_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P7_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p8-3" class="section level3">
 <h3><span class="header-section-number">3.4.4</span> Patient - P8</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P8_DNEG_1-1">
+Past versions of P8_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P8_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P8_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p14-3" class="section level3">
 <h3><span class="header-section-number">3.4.5</span> Patient - P14</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P14_DNEG_1-1">
+Past versions of P14_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P14_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P14_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p15-3" class="section level3">
 <h3><span class="header-section-number">3.4.6</span> Patient - P15</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P15_DNEG_1-1">
+Past versions of P15_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P15_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P15_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p16-3" class="section level3">
 <h3><span class="header-section-number">3.4.7</span> Patient - P16</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P16_DNEG_1-1">
+Past versions of P16_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P16_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P16_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p18-3" class="section level3">
 <h3><span class="header-section-number">3.4.8</span> Patient - P18</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P18_DNEG_1-1">
+Past versions of P18_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P18_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P18_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p19-3" class="section level3">
 <h3><span class="header-section-number">3.4.9</span> Patient - P19</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P19_DNEG_1-1">
+Past versions of P19_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P19_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P19_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p21-3" class="section level3">
 <h3><span class="header-section-number">3.4.10</span> Patient - P21</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P21_DNEG_1-1">
+Past versions of P21_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P21_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P21_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p22-3" class="section level3">
 <h3><span class="header-section-number">3.4.11</span> Patient - P22</h3>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_DNEG_1-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-P22_DNEG_1-1">
+Past versions of P22_DNEG_1-1.png
+</button>
+</p>
+<div id="fig-P22_DNEG_1-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/P22_DNEG_1-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div id="patient---p23-3" class="section level3">
 <h3><span class="header-section-number">3.4.12</span> Patient - P23</h3>
@@ -908,11 +2534,85 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 <h2><span class="header-section-number">3.5</span> Summary</h2>
 <p><strong>TRAC</strong></p>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-24-1.png" width="384" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-24-1">
+Past versions of unnamed-chunk-24-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-24-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-24-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-26-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-26-1">
+Past versions of unnamed-chunk-26-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-26-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-26-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><em>Table - # of patients per fraction</em></p>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"7","3":"4"},{"1":"TIGIT+","2":"8","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"6","3":"4"},{"1":"TIGIT+","2":"7","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 <p><em>Table - NR - # of patients per cluster</em></p>
@@ -929,11 +2629,85 @@ dt &lt;- merge(dt, TCR.pData[, c(&quot;QIAGEN.id&quot;, &quot;sample.number&quot
 </div>
 <p><strong>TRBC</strong></p>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-31-1.png" width="384" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-31-1">
+Past versions of unnamed-chunk-31-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-31-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-31-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><img src="figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-33-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-33-1">
+Past versions of unnamed-chunk-33-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-33-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/ValentinVoillet/Simon_et_al_2020/blob/7145ac8c4dc6db97b3e1f5a5cb6ba8dc9e2d5717/docs/figure/2020-01-12_TCR-seq_EDA_2.Rmd/unnamed-chunk-33-1.png" target="_blank">7145ac8</a>
+</td>
+<td>
+ValentinVoillet
+</td>
+<td>
+2020-01-14
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <p><em>Table - # of patients per fraction</em></p>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"7","3":"4"},{"1":"TIGIT+","2":"8","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["fraction"],"name":[1],"type":["chr"],"align":["left"]},{"label":["NR"],"name":[2],"type":["int"],"align":["right"]},{"label":["R"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"PD-1-TIGIT-","2":"7","3":"4"},{"1":"PD-1+","2":"6","3":"4"},{"1":"PD-1+TIGIT+","2":"6","3":"4"},{"1":"TIGIT+","2":"7","3":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 <p><em>Table - NR - # of patients per cluster</em></p>
