@@ -67,7 +67,8 @@ here("output", "TCR_pData.rds") %>%
   readRDS() -> TCR.pData
 # pData (patient/fraction w/ at least T0 & M1)
 TCR.pData %>% select(patient.id, time.point, fraction, outcome) %>% View("pData")
-TCR.pData <- TCR.pData[c(1:39, 41:43, 45:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData <- TCR.pData[c(1:39, 41:43, 45:114, 117:120, 123:125, 127, 130, 132, 135:146, 148:154, 157:158), ] 
+TCR.pData %>% filter(time.point != "M2" & time.point != "M6") -> TCR.pData
 TCR.pData %>%
   arrange(patient.id) %>%
   select(patient.id, time.point, fraction, outcome) %>% 
@@ -120,7 +121,6 @@ dt <- merge(dt, TCR.pData[, c("QIAGEN.id", "sample.number", "sample.id", "treatm
 ```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
 ###--- Boxplot - A
 dt %>%
-  filter(time.point != "M6") %>%
   ggplot(aes(x = fraction.desc, y = clonality)) +
     geom_jitter(aes(color = fraction.desc), size = .4) +
     geom_boxplot(aes(fill = fraction.desc), outlier.shape = NA) +
@@ -141,7 +141,6 @@ dt %>%
 
 ###--- Boxplot - B
 dt %>%
-  filter(time.point != "M6") %>%
   ggplot(aes(x = fraction.desc, y = clonality)) +
   geom_jitter(aes(color = fraction.desc, alpha = outcome), size = .4) +
   geom_boxplot(aes(fill = fraction.desc, alpha = outcome), outlier.shape = NA) +
@@ -170,7 +169,6 @@ cowplot::plot_grid(plotA, plotB, ncol = 2)
 ```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
 ###--- Statistics - between outcomes within each fraction & time point
 dt %>%
-  filter(time.point != "M6") %>%
   select(chain, time.point, fraction.desc, outcome, clonality) %>%
   group_by(chain, time.point, fraction.desc) %>%
   do(tidy(wilcox.test(clonality ~ outcome, data = ., paired = FALSE))) %>%
@@ -178,7 +176,6 @@ dt %>%
 
 ###--- Statistics - between fractions within each time point
 dt %>%
-  filter(time.point != "M6") %>%
   select(chain, time.point, fraction.desc, clonality, patient.id) %>%
   group_by(chain, time.point) %>%
   do(tidy(kruskal.test(clonality ~ fraction.desc, data = .))) %>%
@@ -645,7 +642,6 @@ dt.P5 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P5) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -718,7 +714,6 @@ dt.P6 <- foreach(i = 1:3) %dopar%
 bind_rows(dt.P6) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -793,7 +788,6 @@ dt.P7 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P7) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -868,7 +862,6 @@ dt.P8 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P8) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -943,7 +936,6 @@ dt.P14 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P14) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1018,7 +1010,6 @@ dt.P15 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P15) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1093,7 +1084,6 @@ dt.P16 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P16) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1168,7 +1158,6 @@ dt.P18 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P18) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1243,7 +1232,6 @@ dt.P19 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P19) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1318,7 +1306,6 @@ dt.P21 <- foreach(i = 1:4) %dopar%
 bind_rows(dt.P21) %>%
   filter(fraction == "PD-1+TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1450,7 +1437,6 @@ No PD-1+TIGIT+ sample (T0 & M1).
 bind_rows(dt.P5) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1473,7 +1459,6 @@ No PD-1+ sample (T0 & M1).
 bind_rows(dt.P7) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1492,7 +1477,6 @@ bind_rows(dt.P7) %>%
 bind_rows(dt.P8) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1511,7 +1495,6 @@ bind_rows(dt.P8) %>%
 bind_rows(dt.P14) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1530,7 +1513,6 @@ bind_rows(dt.P14) %>%
 bind_rows(dt.P15) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1549,7 +1531,6 @@ bind_rows(dt.P15) %>%
 bind_rows(dt.P16) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1568,7 +1549,6 @@ bind_rows(dt.P16) %>%
 bind_rows(dt.P18) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1587,7 +1567,6 @@ bind_rows(dt.P18) %>%
 bind_rows(dt.P19) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1606,7 +1585,6 @@ bind_rows(dt.P19) %>%
 bind_rows(dt.P21) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1625,7 +1603,6 @@ bind_rows(dt.P21) %>%
 bind_rows(dt.P22) %>%
   filter(fraction == "PD-1+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1651,7 +1628,6 @@ No PD-1+ sample (T0 & M1).
 bind_rows(dt.P5) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1670,7 +1646,6 @@ bind_rows(dt.P5) %>%
 bind_rows(dt.P6) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1689,7 +1664,6 @@ bind_rows(dt.P6) %>%
 bind_rows(dt.P7) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1708,7 +1682,6 @@ bind_rows(dt.P7) %>%
 bind_rows(dt.P8) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1727,7 +1700,6 @@ bind_rows(dt.P8) %>%
 bind_rows(dt.P14) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1746,7 +1718,6 @@ bind_rows(dt.P14) %>%
 bind_rows(dt.P15) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1765,7 +1736,6 @@ bind_rows(dt.P15) %>%
 bind_rows(dt.P16) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1784,7 +1754,6 @@ bind_rows(dt.P16) %>%
 bind_rows(dt.P18) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1803,7 +1772,6 @@ bind_rows(dt.P18) %>%
 bind_rows(dt.P19) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1822,7 +1790,6 @@ bind_rows(dt.P19) %>%
 bind_rows(dt.P21) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1845,7 +1812,6 @@ No TIGIT+ sample (T0 & M1).
 bind_rows(dt.P23) %>%
   filter(fraction == "TIGIT+") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1867,7 +1833,6 @@ bind_rows(dt.P23) %>%
 bind_rows(dt.P5) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1886,7 +1851,6 @@ bind_rows(dt.P5) %>%
 bind_rows(dt.P6) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1905,7 +1869,6 @@ bind_rows(dt.P6) %>%
 bind_rows(dt.P7) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1924,7 +1887,6 @@ bind_rows(dt.P7) %>%
 bind_rows(dt.P8) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1943,7 +1905,6 @@ bind_rows(dt.P8) %>%
 bind_rows(dt.P14) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1962,7 +1923,6 @@ bind_rows(dt.P14) %>%
 bind_rows(dt.P15) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -1981,7 +1941,6 @@ bind_rows(dt.P15) %>%
 bind_rows(dt.P16) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -2000,7 +1959,6 @@ bind_rows(dt.P16) %>%
 bind_rows(dt.P18) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -2019,7 +1977,6 @@ bind_rows(dt.P18) %>%
 bind_rows(dt.P19) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -2038,7 +1995,6 @@ bind_rows(dt.P19) %>%
 bind_rows(dt.P21) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -2057,7 +2013,6 @@ bind_rows(dt.P21) %>%
 bind_rows(dt.P22) %>%
   filter(fraction == "PD-1-TIGIT-") %>%
   reshape2::melt(id.vars = c("sequence", "cdr3aa", "cdr3nt", "contrast", "cluster", "patient.id", "v_genes", "j_genes", "outcome", "chain", "fraction")) %>%
-  filter(variable != "M2" & variable != "M6") %>%
   mutate(time.point = factor(variable, levels = c("T0", "M1"))) %>%
   ggplot(aes(x = time.point, y = value)) +
     geom_line(aes(group = sequence, color = cluster, lty = chain)) +
@@ -2102,7 +2057,7 @@ bind_rows(dt) %>%
   ggplot(aes(x = cluster, y = freq)) +
     geom_boxplot(aes(fill = fraction)) +
     scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
-    labs(y = "TRAC - freq clonotypes", fill = "Fraction") +
+    labs(y = "TRAC - Frequence clonotypes", fill = "Fraction") +
     ylim(c(0, 1)) +
     theme_bw() +
     theme(legend.position = "bottom",
@@ -2168,7 +2123,7 @@ bind_rows(dt) %>%
   scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
   scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
   facet_wrap(~ cluster, ncol = 4) +
-  labs(y = "freq clonotypes", fill = "Fraction", alpha = "Outcome") +
+  labs(y = "Frequence clonotypes", fill = "Fraction", alpha = "Outcome") +
   guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
   theme_bw() +
   theme(legend.position = "bottom",
@@ -2295,7 +2250,7 @@ bind_rows(dt) %>%
   ggplot(aes(x = cluster, y = freq)) +
     geom_boxplot(aes(fill = fraction)) +
     scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
-    labs(y = "TRBC - freq clonotypes", fill = "Fraction") +
+    labs(y = "TRBC - Frequence clonotypes", fill = "Fraction") +
     ylim(c(0, 1)) +
     theme_bw() +
     theme(legend.position = "bottom",
@@ -2361,7 +2316,7 @@ bind_rows(dt) %>%
   scale_fill_manual(values = c("#4FFFFF", "#ADB2BD", "#F28500", "#3EA055")) +
   scale_alpha_manual(values = c("NR" = 1, "R" = .3)) +
   facet_wrap(~ cluster, ncol = 4) +
-  labs(y = "freq clonotypes", fill = "Fraction", alpha = "Outcome") +
+  labs(y = "Frequence clonotypes", fill = "Fraction", alpha = "Outcome") +
   guides(alpha = guide_legend(override.aes = list(alpha = c(1, .3), fill = "grey"))) +
   theme_bw() +
   theme(legend.position = "bottom",
