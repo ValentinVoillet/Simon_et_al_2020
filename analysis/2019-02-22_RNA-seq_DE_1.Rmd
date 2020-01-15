@@ -1,0 +1,771 @@
+---
+title: "- RNA-seq - DE Analysis (1) -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 22nd 2019*  
+*Update: January, 15th 2020*   
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(Biobase)
+library(limma)
+library(edgeR)
+library(here)
+library(doMC)
+library(DT)
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+load(here("output", "2019-02-22_RNA-seq_DE_1.RData"))
+# save.image(here("output", "2019-02-22_RNA-seq_DE_1.RData"))
+```
+
+
+# Statistical Analysis
+______________________
+
+## Differential analysis across time points within each fraction  
+
+Statistical analyses are performed with the `limma` R package (well-established package for RNA-seq and microarray analysis). A linear model is fitted to each gene, and empirical Bayes moderated t-statistics are used to assess differences in expression. Within each fraction, three contrasts of interest are investigated   
+
+* T0 vs M1;  
+
+* T0 vs M2;  
+
+* M1 vs M2.  
+
+We subset the whole dataset into different subsets depending on the fraction. Moreover, given that several conditions are from the same donors, a block (donor) level random effect is added to the linear model (`duplicateCorrelation` R function) - Intra-class correlations are estimated to account for measures originating from the same donors. An absolute log2-fold change cutoff of 1 and a false discovery rate (FDR) cutoff of 5% are used to determine differentially expressed genes (DEGs); whereas a false discovery rate (FDR) cutoff of 5% is used to determine differentially expressed gene sets (GSEA).  
+
+### Fraction PD-1-TIGIT- - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1-TIGIT-")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), 
+                            T0_vs_M2 = (T0 - M2), 
+                            M1_vs_M2 = (M1 - M2), 
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_1 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_1), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_1 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_PD-1-TIGIT-_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_1) <- colnames(aovCon.tmp)
+
+results_DEGs_1$T0_vs_M1[Direction != "NotDE"] # 1 DEG
+results_DEGs_1$T0_vs_M2[Direction != "NotDE"] # 0 DEG
+results_DEGs_1$M1_vs_M2[Direction != "NotDE"] # 0 DEG
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* T0 vs M1 - __1 DEG__;  
+
+* T0 vs M2 - __0 DEG__;  
+
+* M1 vs M2 - __0 DEG__.  
+
+NB: There is also no DEG across time points using the `patient.id` as fixed effect in the model in order to look at difference within subject.  
+
+**Volcano plots**
+
+```{r volcano_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_1), ID = c(rep(names(results_DEGs_1)[1], 975), rep(names(results_DEGs_1)[2], 975), rep(names(results_DEGs_1)[3], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("T0 vs M1", "T0 vs M2", "M1 vs M2"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:3)
+{
+  results.tmp <- do.call(c, list(results_DEGs_1, results_DEGs_1))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("T0 vs M1", "T0 vs M2", "M1 vs M2"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+```
+
+**Boxplot**
+
+```{r boxplot_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=3, fig.height=4}
+###--- Boxplot
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+countData <- countData[, colnames(normData_1)]
+
+data.table(MYO7A = normData_1["MYO7A", ], pData(countData)) %>%
+  filter(time.point == "T0" | time.point == "M1") %>%
+  mutate(time.point = factor(time.point, levels = c("T0", "M1"))) %>%
+  ggplot(aes(x = time.point, y = MYO7A)) +
+    geom_boxplot(aes(fill = time.point), outlier.shape = NULL) +
+    geom_line(aes(group = patient.id), color = "grey70", size = .3) +
+    geom_point(aes(color = patient.id)) +
+    labs(y = "MYO7A - normalized gene expression") +
+    theme_classic() +
+    theme(legend.position = "none", axis.title.x = element_blank())
+```
+
+### Fraction PD-1-TIGIT- - GSEA
+
+Three databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+gene.sets <- readRDS(file = here("data", "gene-sets", "genesets_human.rds"))
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1-TIGIT-")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), T0_vs_M2 = (T0 - M2), M1_vs_M2 = (M1 - M2), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_1))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_1 <- foreach(i = 1:length(results_DEGs_1)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_PD-1-TIGIT-_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_1) <- names(results_DEGs_1)
+```
+
+There are (FDR 5%)  
+
+* T0 vs M1 - __0 gene set__ - KEGG;  
+
+* T0 vs M1 - __0 gene set__ - Hallmark;  
+
+* T0 vs M1 - __6 gene sets__ - c7;  
+
+* T0 vs M2 - __0 gene set__ - KEGG;  
+
+* T0 vs M2 - __0 gene set__ - Hallmark;  
+
+* T0 vs M2 - __2 gene sets__ - c7;  
+
+* M1 vs M2 - __0 gene set__ - KEGG;  
+
+* M1 vs M2 - __0 gene set__ - Hallmark;  
+
+* M1 vs M2 - __1 gene set__ - c7.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+
+### Fraction PD-1+ - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1+")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), 
+                            T0_vs_M2 = (T0 - M2), 
+                            M1_vs_M2 = (M1 - M2), 
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_2 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_2), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_2 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_PD-1+_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_2) <- colnames(aovCon.tmp)
+
+results_DEGs_2$T0_vs_M1[Direction != "NotDE"] # 0 DEG
+results_DEGs_2$T0_vs_M2[Direction != "NotDE"] # 0 DEG
+results_DEGs_2$M1_vs_M2[Direction != "NotDE"] # 0 DEG
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* T0 vs M1 - __0 DEG__;  
+
+* T0 vs M2 - __0 DEG__;  
+
+* M1 vs M2 - __0 DEG__.  
+
+NB: There is also no DEG across time points using the `patient.id` as fixed effect in the model in order to look at difference within subject.  
+
+**Volcano plots**
+
+```{r volcano_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_2), ID = c(rep(names(results_DEGs_2)[1], 975), rep(names(results_DEGs_2)[2], 975), rep(names(results_DEGs_2)[3], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("T0 vs M1", "T0 vs M2", "M1 vs M2"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:3)
+{
+  results.tmp <- do.call(c, list(results_DEGs_2, results_DEGs_2))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("T0 vs M1", "T0 vs M2", "M1 vs M2"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+```
+
+### Fraction PD-1+ - GSEA
+
+Three databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+gene.sets <- readRDS(file = here("data", "gene-sets", "genesets_human.rds"))
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1+")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), T0_vs_M2 = (T0 - M2), M1_vs_M2 = (M1 - M2), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_2))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_2 <- foreach(i = 1:length(results_DEGs_2)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_PD-1+_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_2) <- names(results_DEGs_2)
+```
+
+There are (FDR 5%)  
+
+* T0 vs M1 - __0 gene set__ - KEGG;  
+
+* T0 vs M1 - __0 gene set__ - Hallmark;  
+
+* T0 vs M1 - __1 gene set__ - c7;  
+
+* T0 vs M2 - __2 gene sets__ - KEGG;  
+
+* T0 vs M2 - __0 gene set__ - Hallmark;  
+
+* T0 vs M2 - __8 gene sets__ - c7;  
+
+* M1 vs M2 - __0 gene set__ - KEGG;  
+
+* M1 vs M2 - __0 gene set__ - Hallmark;  
+
+* M1 vs M2 - __0 gene set__ - c7.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+### Fraction PD-1+TIGIT+ - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1+TIGIT+")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), 
+                            T0_vs_M2 = (T0 - M2), 
+                            M1_vs_M2 = (M1 - M2), 
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_3 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_3), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_3 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_PD-1+TIGIT+_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_3) <- colnames(aovCon.tmp)
+
+results_DEGs_3$T0_vs_M1[Direction != "NotDE"] # 0 DEG
+results_DEGs_3$T0_vs_M2[Direction != "NotDE"] # 0 DEG
+results_DEGs_3$M1_vs_M2[Direction != "NotDE"] # 0 DEG
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* T0 vs M1 - __0 DEG__;  
+
+* T0 vs M2 - __0 DEG__;  
+
+* M1 vs M2 - __0 DEG__.  
+
+NB: There is also no DEG across time points using the `patient.id` as fixed effect in the model in order to look at difference within subject.  
+
+**Volcano plots**
+
+```{r volcano_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_3), ID = c(rep(names(results_DEGs_3)[1], 975), rep(names(results_DEGs_3)[2], 975), rep(names(results_DEGs_3)[3], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("T0 vs M1", "T0 vs M2", "M1 vs M2"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:3)
+{
+  results.tmp <- do.call(c, list(results_DEGs_3, results_DEGs_3))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("T0 vs M1", "T0 vs M2", "M1 vs M2"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+```
+
+### Fraction PD-1+TIGIT+ - GSEA
+
+Three databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+gene.sets <- readRDS(file = here("data", "gene-sets", "genesets_human.rds"))
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$fraction.desc == "PD-1+TIGIT+")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), T0_vs_M2 = (T0 - M2), M1_vs_M2 = (M1 - M2), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_3))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_3 <- foreach(i = 1:length(results_DEGs_3)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_PD-1+TIGIT+_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_3) <- names(results_DEGs_3)
+```
+
+There are (FDR 5%)  
+
+* T0 vs M1 - __0 gene set__ - KEGG;  
+
+* T0 vs M1 - __0 gene set__ - KEGG;  
+
+* T0 vs M1 - __0 gene set__ - Hallmark;  
+
+* T0 vs M1 - __21 gene sets__ - c7;  
+
+* T0 vs M2 - __0 gene set__ - KEGG;  
+
+* T0 vs M2 - __0 gene set__ - Hallmark;  
+
+* T0 vs M2 - __0 gene set__ - c7;  
+
+* M1 vs M2 - __0 gene set__ - KEGG;  
+
+* M1 vs M2 - __0 gene set__ - Hallmark;  
+
+* M1 vs M2 - __12 gene sets__ - c7.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+### Fraction TIGIT+ - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$fraction.desc == "TIGIT+")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), 
+                            T0_vs_M2 = (T0 - M2), 
+                            M1_vs_M2 = (M1 - M2), 
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_4 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_4), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_4 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_TIGIT+_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_4) <- colnames(aovCon.tmp)
+
+results_DEGs_4$T0_vs_M1[Direction != "NotDE"] # 0 DEG
+results_DEGs_4$T0_vs_M2[Direction != "NotDE"] # 0 DEG
+results_DEGs_4$M1_vs_M2[Direction != "NotDE"] # 0 DEG
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* T0 vs M1 - __0 DEG__;  
+
+* T0 vs M2 - __0 DEG__;  
+
+* M1 vs M2 - __0 DEG__.  
+
+NB: There is also no DEG across time points using the `patient.id` as fixed effect in the model in order to look at difference within subject.  
+
+**Volcano plots**
+
+```{r volcano_4, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_4), ID = c(rep(names(results_DEGs_4)[1], 975), rep(names(results_DEGs_4)[2], 975), rep(names(results_DEGs_4)[3], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("T0 vs M1", "T0 vs M2", "M1 vs M2"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:3)
+{
+  results.tmp <- do.call(c, list(results_DEGs_4, results_DEGs_4))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("T0 vs M1", "T0 vs M2", "M1 vs M2"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+```
+
+### Fraction TIGIT+ - GSEA
+
+Three databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+gene.sets <- readRDS(file = here("data", "gene-sets", "genesets_human.rds"))
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$fraction.desc == "TIGIT+")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + time.point, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "time.point")
+aovCon.tmp <- makeContrasts(T0_vs_M1 = (T0 - M1), T0_vs_M2 = (T0 - M2), M1_vs_M2 = (M1 - M2), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_4))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_4 <- foreach(i = 1:length(results_DEGs_4)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_TIGIT+_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_4) <- names(results_DEGs_4)
+```
+
+There are (FDR 5%)  
+
+* T0 vs M1 - __0 gene set__ - KEGG;  
+
+* T0 vs M1 - __0 gene set__ - Hallmark;  
+
+* T0 vs M1 - __20 gene sets__ - c7;  
+
+* T0 vs M2 - __0 gene set__ - KEGG;  
+
+* T0 vs M2 - __2 gene sets__ - Hallmark;  
+
+* T0 vs M2 - __47 gene sets__ - c7;  
+
+* M1 vs M2 - __0 gene set__ - KEGG;  
+
+* M1 vs M2 - __0 gene set__ - Hallmark;  
+
+* M1 vs M2 - __1 gene set__ - c7.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+
+
+
+
+
+
