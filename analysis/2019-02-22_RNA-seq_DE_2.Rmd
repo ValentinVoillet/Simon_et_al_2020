@@ -1,0 +1,738 @@
+---
+title: "- RNA-seq - DE Analysis (2) -"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body{text-align: justify}
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+
+*File creation: February, 22nd 2019*  
+*Update: January, 15th 2020*   
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(Biobase)
+library(limma)
+library(edgeR)
+library(here)
+library(doMC)
+library(DT)
+library(ComplexHeatmap)
+library(VennDiagram)
+library(gridExtra)
+```
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+load(here("output", "2019-02-22_RNA-seq_DE_2.RData"))
+# save.image(here("output", "2019-02-22_RNA-seq_DE_2.RData"))
+```
+
+# Statistical Analysis
+______________________
+
+## Differential analysis btw fractions within each time point  
+
+Statistical analyses are performed w/ the `limma` R package (well-established package for RNA-seq and microarray analysis). A linear model is fitted to each gene, and empirical Bayes moderated t-statistics are used to assess differences in expression. Within each time point, six contrasts of interest are investigated   
+
+* PD-1-TIGIT- vs PD-1+TIGIT+;  
+
+* PD-1-TIGIT- vs PD-1+;  
+
+* PD-1-TIGIT- vs TIGIT+;  
+
+* PD-1+TIGIT+ vs PD-1+;  
+
+* PD-1+TIGIT+ vs TIGIT+;  
+
+* PD-1+ vs TIGIT+.  
+
+We subset the whole dataset into different subsets depending on the combination time point & treatment. Moreover, given that several conditions are from the same donors, a block (donor) level random effect is added to the linear model (`duplicateCorrelation` R function) - Intra-class correlations are estimated to account for measures originating from the same donors. An absolute log2-fold change cutoff of 1 and a false discovery rate (FDR) cutoff of 5% are used to determine differentially expressed genes (DEGs); whereas a false discovery rate (FDR) cutoff of 5% is used to determine differentially expressed gene sets (GSEA).   
+
+### Time point T0 - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$time.point == "T0")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS),  
+                            DNEG_vs_PD1 = c(DNEG - PD1),  
+                            DNEG_vs_TIGIT = c(DNEG - TIGIT), 
+                            DPOS_vs_PD1 = c(DPOS - PD1),  
+                            DPOS_vs_TIGIT = c(DPOS - TIGIT), 
+                            PD1_vs_TIGIT = c(PD1 - TIGIT),
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_1 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_1), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting (anti-PD1)
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_1 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_T0_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_1) <- colnames(aovCon.tmp)
+
+results_DEGs_1$DNEG_vs_DPOS[Direction != "NotDE"] # 171 DEGs
+results_DEGs_1$DNEG_vs_PD1[Direction != "NotDE"] # 121 DEGs
+results_DEGs_1$DNEG_vs_TIGIT[Direction != "NotDE"] # 159 DEGs
+results_DEGs_1$DPOS_vs_PD1[Direction != "NotDE"] # 68 DEGs
+results_DEGs_1$DPOS_vs_TIGIT[Direction != "NotDE"] # 33 DEGs
+results_DEGs_1$PD1_vs_TIGIT[Direction != "NotDE"] # 81 DEGs
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __171 DEGs__;  
+
+* PD-1-TIGIT- vs PD-1+ - __121 DEGs__;  
+
+* PD-1-TIGIT- vs TIGIT+ - __159 DEGs__;  
+
+* PD-1+TIGIT+ vs PD-1+ - __68 DEGs__;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __33 DEGs__;  
+
+* PD-1+ vs TIGIT+ - __81 DEGs__.  
+
+**Volcano plots**
+
+```{r volcano_1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_1), ID = c(rep(names(results_DEGs_1)[1], 975), rep(names(results_DEGs_1)[2], 975), rep(names(results_DEGs_1)[3], 975), rep(names(results_DEGs_1)[4], 975), rep(names(results_DEGs_1)[5], 975), rep(names(results_DEGs_1)[6], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("DNEG vs DPOS", "DNEG vs PD1", "DNEG vs TIGIT", "DPOS vs PD1", "DPOS vs TIGIT", "PD1 vs TIGIT"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:6)
+{
+  results.tmp <- do.call(c, list(results_DEGs_1, results_DEGs_1))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("PD-1-TIGIT- vs PD-1+TIGIT+", 
+                                "PD-1-TIGIT- vs PD-1+", 
+                                "PD-1-TIGIT- vs TIGIT+", 
+                                "PD-1+TIGIT+ vs PD-1+", 
+                                "PD-1+TIGIT+ vs TIGIT+", 
+                                "PD-1+ vs TIGIT+"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+datatable(DT_print[[4]], caption = contrast[4], options = list(pageLength = 5))
+datatable(DT_print[[5]], caption = contrast[5], options = list(pageLength = 5))
+datatable(DT_print[[6]], caption = contrast[6], options = list(pageLength = 5))
+```
+
+### Time point T0 - GSEA
+
+Four databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7;  
+
+* Sylvain's gene sets.  
+
+```{r echo=FALSE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Sylvain"s gene sets
+gene.sets <- readRDS(file = here("data", "gene-sets", "genesets_human.rds"))
+sylvain <- list(`Thommen et al. - upregulated` = c("HAVCR2", "LAG3", "CTLA4", "CD200", "CD109", "ENTPD1", "GITR", "TNFRSF18", "CD28", "TNFSF9", "CD27", "MKI67", "CXCL13", "IL10"),
+                `Thommen et al. - downregulated` = c("IL2", "TNF", "IFNG", "DPP4", "KLRG1"),
+                `Li et al. - exhaustion` = c("ZBED2", "ETV1", "ID3", "MAF", "PRDM1", "EOMES", "CXCL13", "IFNG", "VDR", "TOX"),
+                `Wu et al. - TFC/Tfh` = c("CXCR5", "CXCL13", "CCR7", "CXCR3", "CD69", "SELL", "IL7R", "GZMA", "GZMB", "PRF1", "LAMP1", "IFNG", "HAVCR2", "CD244", "CD160", "LAG3", "CD28", "ICOS", "HNF1A", "BCL6", "PRDM1", "ID2", "ID3", "TBX21", "EOMES", "AFF3", "IKZF2", "IL23R", "TNFSF8"))
+gene.sets[[4]] <- sylvain
+names(gene.sets) <- c("KEGG", "Hallmark", "ImmunologicSignatures_c7", "Sylvain_genesets")
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$time.point == "T0")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS), DNEG_vs_PD1 = c(DNEG - PD1), DNEG_vs_TIGIT = c(DNEG - TIGIT), DPOS_vs_PD1 = c(DPOS - PD1), DPOS_vs_TIGIT = c(DPOS - TIGIT), PD1_vs_TIGIT = c(PD1 - TIGIT), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_1))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_1 <- foreach(i = 1:length(results_DEGs_1)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_T0_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_1) <- names(results_DEGs_1)
+```
+
+There are (FDR 5%)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __8 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __4 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __140 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __3 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs PD-1+ - __6 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+ - __3 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+ - __187 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs TIGIT+ - __8 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs TIGIT+ - __2 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs TIGIT+ - __115 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs TIGIT+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs PD-1+ - __7 gene sets__ - KEGG;  
+
+* PD-1+TIGIT+ vs PD-1+ - __0 gene set__ - Hallmark;  
+
+* PD-1+TIGIT+ vs PD-1+ - __17 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs PD-1+ - __3 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __0 gene set__ - KEGG;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __1 gene set__ - Hallmark;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __5 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+ vs TIGIT+ - __1 gene set__ - KEGG;  
+
+* PD-1+ vs TIGIT+ - __0 gene set__ - Hallmark;  
+
+* PD-1+ vs TIGIT+ - __9 gene sets__ - c7;  
+
+* PD-1+ vs TIGIT+ - __0 gene set__ - Sylvain's gene sets.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+### Time point M1 - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$time.point == "M1")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS),  
+                            DNEG_vs_PD1 = c(DNEG - PD1),  
+                            DNEG_vs_TIGIT = c(DNEG - TIGIT), 
+                            DPOS_vs_PD1 = c(DPOS - PD1),  
+                            DPOS_vs_TIGIT = c(DPOS - TIGIT), 
+                            PD1_vs_TIGIT = c(PD1 - TIGIT),
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_2 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_2), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting (anti-PD1)
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_2 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_M1_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_2) <- colnames(aovCon.tmp)
+
+results_DEGs_2$DNEG_vs_DPOS[Direction != "NotDE"] # 121 DEGs
+results_DEGs_2$DNEG_vs_PD1[Direction != "NotDE"] # 72 DEGs
+results_DEGs_2$DNEG_vs_TIGIT[Direction != "NotDE"] # 125 DEGs
+results_DEGs_2$DPOS_vs_PD1[Direction != "NotDE"] # 68 DEGs
+results_DEGs_2$DPOS_vs_TIGIT[Direction != "NotDE"] # 40 DEGs
+results_DEGs_2$PD1_vs_TIGIT[Direction != "NotDE"] # 58 DEGs
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __121 DEGs__;  
+
+* PD-1-TIGIT- vs PD-1+ - __72 DEGs__;  
+
+* PD-1-TIGIT- vs TIGIT+ - __125 DEGs__;  
+
+* PD-1+TIGIT+ vs PD-1+ - __68 DEGs__;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __40 DEGs__;  
+
+* PD-1+ vs TIGIT+ - __58 DEGs__.  
+
+**Volcano plots**
+
+```{r volcano_2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_2), ID = c(rep(names(results_DEGs_2)[1], 975), rep(names(results_DEGs_2)[2], 975), rep(names(results_DEGs_2)[3], 975), rep(names(results_DEGs_2)[4], 975), rep(names(results_DEGs_2)[5], 975), rep(names(results_DEGs_2)[6], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("DNEG vs DPOS", "DNEG vs PD1", "DNEG vs TIGIT", "DPOS vs PD1", "DPOS vs TIGIT", "PD1 vs TIGIT"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:6)
+{
+  results.tmp <- do.call(c, list(results_DEGs_2, results_DEGs_2))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("PD-1-TIGIT- vs PD-1+TIGIT+", 
+                                "PD-1-TIGIT- vs PD-1+", 
+                                "PD-1-TIGIT- vs TIGIT+", 
+                                "PD-1+TIGIT+ vs PD-1+", 
+                                "PD-1+TIGIT+ vs TIGIT+", 
+                                "PD-1+ vs TIGIT+"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+datatable(DT_print[[4]], caption = contrast[4], options = list(pageLength = 5))
+datatable(DT_print[[5]], caption = contrast[5], options = list(pageLength = 5))
+datatable(DT_print[[6]], caption = contrast[6], options = list(pageLength = 5))
+```
+
+### Time point M1 - GSEA
+
+Four databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7;  
+
+* Sylvain's gene sets.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$time.point == "M1")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS), DNEG_vs_PD1 = c(DNEG - PD1), DNEG_vs_TIGIT = c(DNEG - TIGIT), DPOS_vs_PD1 = c(DPOS - PD1), DPOS_vs_TIGIT = c(DPOS - TIGIT), PD1_vs_TIGIT = c(PD1 - TIGIT), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_2))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_2 <- foreach(i = 1:length(results_DEGs_2)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_M1_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_2) <- names(results_DEGs_2)
+```
+
+There are (FDR 5%)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __11 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __4 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __228 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __3 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs PD-1+ - __1 gene set__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+ - __0 gene set__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+ - __212 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+ - __4 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs TIGIT+ - __6 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs TIGIT+ - __2 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs TIGIT+ - __80 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs TIGIT+ - __1 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs PD-1+ - __6 gene sets__ - KEGG;  
+
+* PD-1+TIGIT+ vs PD-1+ - __2 gene sets__ - Hallmark;  
+
+* PD-1+TIGIT+ vs PD-1+ - __92 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs PD-1+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - KEGG;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - Hallmark;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __75 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+ vs TIGIT+ - __7 gene sets__ - KEGG;  
+
+* PD-1+ vs TIGIT+ - __1 gene set__ - Hallmark;  
+
+* PD-1+ vs TIGIT+ - __24 gene sets__ - c7;  
+
+* PD-1+ vs TIGIT+ - __0 gene set__ - Sylvain's gene sets.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+### Time point M2 - DEGs
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- DE Analysis
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+#- Subsetting
+countData.tmp <- countData[, which(countData$time.point == "M2")]
+#- phenoData
+phenoData.tmp <- pData(countData.tmp)
+phenoData.tmp %>% View("pData")
+#- Normalization factor
+norm.tmp <- calcNormFactors(countData.tmp)
+#- Design matrix
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+#- Contrast matrix
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS),  
+                            DNEG_vs_PD1 = c(DNEG - PD1),  
+                            DNEG_vs_TIGIT = c(DNEG - TIGIT), 
+                            DPOS_vs_PD1 = c(DPOS - PD1),  
+                            DPOS_vs_TIGIT = c(DPOS - TIGIT), 
+                            PD1_vs_TIGIT = c(PD1 - TIGIT),
+                            levels = myDesign.tmp)
+#- Voom transformation
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+normData_3 <- voomData.tmp$E
+#- Donor - duplicateCorrelation
+ranCor.tmp <- duplicateCorrelation(object = voomData.tmp, design = myDesign.tmp, block = phenoData.tmp$patient.id)$consensus.correlation
+identical(colnames(normData_3), rownames(phenoData.tmp)) # TRUE
+```
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- Fitting (anti-PD1)
+fit1.tmp <- lmFit(object = voomData.tmp, design = myDesign.tmp, correlation = ranCor.tmp, block = phenoData.tmp$patient.id)
+fit2.tmp <- contrasts.fit(fit = fit1.tmp, contrasts = aovCon.tmp)
+fit2.tmp <- eBayes(fit = fit2.tmp, trend = FALSE)
+
+registerDoMC(2)
+results_DEGs_3 <- foreach(i = 1:ncol(aovCon.tmp)) %dopar%
+{
+  results.tmp <- topTable(fit = fit2.tmp, adjust.method = "fdr", coef = i, number = nrow(voomData.tmp), sort = "P")
+  results.tmp <- data.table(Gene = rownames(results.tmp), results.tmp)
+  write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("DEGs_M2_", colnames(aovCon.tmp)[i], ".csv")))
+  results.tmp[, Direction := ifelse(adj.P.Val < 0.05 & sign(logFC) == 1 & abs(logFC) >= 1, "Up",
+                                    ifelse(adj.P.Val < 0.05 & sign(logFC) == -1 & abs(logFC) >= 1, "Down", "NotDE"))]
+  return(results.tmp)
+}
+names(results_DEGs_3) <- colnames(aovCon.tmp)
+
+results_DEGs_3$DNEG_vs_DPOS[Direction != "NotDE"] # 166 DEGs
+results_DEGs_3$DNEG_vs_PD1[Direction != "NotDE"] # 95 DEGs
+results_DEGs_3$DNEG_vs_TIGIT[Direction != "NotDE"] # 148 DEGs
+results_DEGs_3$DPOS_vs_PD1[Direction != "NotDE"] # 73 DEGs
+results_DEGs_3$DPOS_vs_TIGIT[Direction != "NotDE"] # 42 DEGs
+results_DEGs_3$PD1_vs_TIGIT[Direction != "NotDE"] # 81 DEGs
+```
+
+There are (FDR 5% & log2-FC > 1)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __166 DEGs__;  
+
+* PD-1-TIGIT- vs PD-1+ - __95 DEGs__;  
+
+* PD-1-TIGIT- vs TIGIT+ - __148 DEGs__;  
+
+* PD-1+TIGIT+ vs PD-1+ - __73 DEGs__;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __42 DEGs__;  
+
+* PD-1+ vs TIGIT+ - __81 DEGs__.  
+
+**Volcano plots**
+
+```{r volcano_3, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6}
+###--- Volcano Plot
+data_ggplot <- bind_rows(data.table(bind_rows(results_DEGs_3), ID = c(rep(names(results_DEGs_3)[1], 975), rep(names(results_DEGs_3)[2], 975), rep(names(results_DEGs_3)[3], 975), rep(names(results_DEGs_3)[4], 975), rep(names(results_DEGs_3)[5], 975), rep(names(results_DEGs_3)[6], 975))))
+
+data_ggplot %>%
+  mutate(ID = str_replace(ID, pattern = "_vs_", replacement = " vs ")) %>%
+  mutate(ID = factor(ID, levels = c("DNEG vs DPOS", "DNEG vs PD1", "DNEG vs TIGIT", "DPOS vs PD1", "DPOS vs TIGIT", "PD1 vs TIGIT"))) %>%
+  ggplot(aes(x = logFC, y = -log10(adj.P.Val), color = Direction)) +
+    geom_point(size = .5, alpha = .5) + 
+    geom_vline(xintercept = c(-1, 1), color = "grey20", lty = 3) + 
+    geom_hline(yintercept = c(-log10(0.05)), color = "grey20", lty = 3) +
+    scale_color_manual(guide = FALSE, values = c("Down" = "royalblue", "Up" = "indianred3", "NotDE" = "grey20")) +
+    facet_wrap(~ ID, ncol = 3) +
+    labs(x = "logFC", y = "-log10(FDR)") +
+    theme_bw()
+```
+
+**Tables**
+
+```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results="asis"}
+###--- Top genes
+DT_print <- list()
+for(i in 1:6)
+{
+  results.tmp <- do.call(c, list(results_DEGs_3, results_DEGs_3))[[i]][, c("Gene", "logFC", "P.Value", "adj.P.Val")]
+  colnames(results.tmp) <- c("Gene", "logFC", "Pvalue", "FDR")
+  DT_print[[i]] <- results.tmp
+}
+contrast <- paste0("DEGs - ", c("PD-1-TIGIT- vs PD-1+TIGIT+", 
+                                "PD-1-TIGIT- vs PD-1+", 
+                                "PD-1-TIGIT- vs TIGIT+", 
+                                "PD-1+TIGIT+ vs PD-1+", 
+                                "PD-1+TIGIT+ vs TIGIT+", 
+                                "PD-1+ vs TIGIT+"))
+datatable(DT_print[[1]], caption = contrast[1], options = list(pageLength = 5))
+datatable(DT_print[[2]], caption = contrast[2], options = list(pageLength = 5))
+datatable(DT_print[[3]], caption = contrast[3], options = list(pageLength = 5))
+datatable(DT_print[[4]], caption = contrast[4], options = list(pageLength = 5))
+datatable(DT_print[[5]], caption = contrast[5], options = list(pageLength = 5))
+datatable(DT_print[[6]], caption = contrast[6], options = list(pageLength = 5))
+```
+
+### Time point M2 - GSEA
+
+Four databases are used (from http://software.broadinstitute.org/gsea/msigdb/collections.jsp)  
+
+* KEGG pathways;  
+
+* Hallmark pathways;  
+
+* Immunologic signatures - c7;  
+
+* Sylvain's gene sets.  
+
+```{r echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+###--- GSEA
+countData <- readRDS(file = here("output", "RNA_count.rds"))
+
+#- countData & norm
+countData.tmp <- countData[, which(countData$time.point == "M2")]
+phenoData.tmp <- pData(countData.tmp)
+norm.tmp <- calcNormFactors(countData.tmp)
+myDesign.tmp <- model.matrix(~ 0 + fraction, data = phenoData.tmp)
+colnames(myDesign.tmp) <- str_remove(string = colnames(myDesign.tmp), pattern = "fraction")
+aovCon.tmp <- makeContrasts(DNEG_vs_DPOS = c(DNEG - DPOS), DNEG_vs_PD1 = c(DNEG - PD1), DNEG_vs_TIGIT = c(DNEG - TIGIT), DPOS_vs_PD1 = c(DPOS - PD1), DPOS_vs_TIGIT = c(DPOS - TIGIT), PD1_vs_TIGIT = c(PD1 - TIGIT), levels = myDesign.tmp)
+voomData.tmp <- voom(counts = countData.tmp, design = myDesign.tmp, lib.size = colSums(exprs(countData.tmp)) * norm.tmp)
+
+#- Get indices
+registerDoMC(2)
+indices.list <- foreach(i = 1:length(gene.sets)) %dopar%
+{
+  indices.tmp <- limma::ids2indices(gene.sets[[i]], rownames(normData_3))
+  indices.tmp <- indices.tmp[sapply(indices.tmp, length) >= 5]
+  return(indices.tmp)
+}
+names(indices.list) <- names(gene.sets)
+
+#- GSEA - camera
+registerDoMC(2)
+results.GSEA_3 <- foreach(i = 1:length(results_DEGs_3)) %dopar%
+{
+  GSEA.tmp <- foreach(j = 1:length(indices.list)) %do%
+  {
+    results.tmp <- camera(voomData.tmp, indices.list[[j]], design = myDesign.tmp, contrast = aovCon.tmp[, i], sort = TRUE)
+    results.tmp <- data.table(`Gene set` = rownames(results.tmp), results.tmp)
+    results.tmp[, Genes := paste(rownames(voomData.tmp)[unlist(indices.list[[j]][`Gene set`])], collapse = ", "), by = `Gene set`]
+    write_csv(x = results.tmp, path = here("output", "output_2019-02-22", paste0("GSEA_M2_", names(indices.list)[j], "_", colnames(aovCon.tmp)[i], ".csv")))
+    results.tmp <- results.tmp[FDR < 0.05]
+    return(results.tmp)
+  }
+  names(GSEA.tmp) <- names(indices.list)
+  return(GSEA.tmp)
+}
+names(results.GSEA_3) <- names(results_DEGs_3)
+```
+
+There are (FDR 5%)  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __7 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __3 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __154 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+TIGIT+ - __3 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs PD-1+ - __5 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs PD-1+ - __2 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs PD-1+ - __220 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs PD-1+ - __4 gene sets__ - Sylvain's gene sets;  
+
+* PD-1-TIGIT- vs TIGIT+ - __9 gene sets__ - KEGG;  
+
+* PD-1-TIGIT- vs TIGIT+ - __2 gene sets__ - Hallmark;  
+
+* PD-1-TIGIT- vs TIGIT+ - __118 gene sets__ - c7;  
+
+* PD-1-TIGIT- vs TIGIT+ - __1/4 gene set__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs PD-1+ - __4 gene sets__ - KEGG;  
+
+* PD-1+TIGIT+ vs PD-1+ - __0 gene set__ - Hallmark;  
+
+* PD-1+TIGIT+ vs PD-1+ - __35 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs PD-1+ - __2 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - KEGG;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __2 gene sets__ - Hallmark;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __89 gene sets__ - c7;  
+
+* PD-1+TIGIT+ vs TIGIT+ - __3 gene sets__ - Sylvain's gene sets;  
+
+* PD-1+ vs TIGIT+ - __2 gene sets__ - KEGG;  
+
+* PD-1+ vs TIGIT+ - __0 gene set__ - Hallmark;  
+
+* PD-1+ vs TIGIT+ - __47 gene sets__ - c7;  
+
+* PD-1+ vs TIGIT+ - __0 gene set__ - Sylvain's gene sets.  
+
+Please look at files (results) in the **output/output_2019-02-22/** folder.  
+
+
