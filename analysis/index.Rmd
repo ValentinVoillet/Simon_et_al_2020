@@ -37,13 +37,12 @@ _____________
   + [within each fraction - differences between time points](2019-02-22_RNA-seq_DE_1.html)  
   + [within each time point - differences between fractions](2019-02-22_RNA-seq_DE_2.html)  
   + [differences between outcomes (non-responders & responders)](2019-02-22_RNA-seq_DE_3.html)  
-  + [interaction across time point and fraction]
 
 
 # **TCR-seq**
 _____________
 
-* [Quality control]()  
+* [Quality control](2019-02-27_TCR-seq_QC.html)  
 
 * Exploratory analysis  
   + [clonality and overlap sequences](2019-02-28_TCR-seq_EDA.html)  
